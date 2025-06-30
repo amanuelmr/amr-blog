@@ -3,22 +3,60 @@ const User = require("../models/User");
 
 // Create a blog
 exports.createBlog = async (req, res) => {
-  const { title, titleBackgroundImageUrl, content, tags } = req.body;
-
   try {
+
+
+    const { title, content, tags } = req.body;
+
+    // Input validation
+    if (!title || !content) {
+      return res.status(400).json({
+        success: false,
+        msg: "Title and content are required"
+      });
+    }
+
+    // Validate user authentication
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({
+        success: false,
+        msg: "User authentication required"
+      });
+    }
+
     const blog = new Blog({
       title,
-      titleBackgroundImageUrl, // Handle background image URL
+      titleBackgroundImageUrl: req.file ? req.file.path : null, // Only use uploaded image
       content,
-      tags,
+      tags: tags ? (Array.isArray(tags) ? tags : tags.split(',').map(tag => tag.trim())) : [],
       author: req.user.id,
     });
 
+
     await blog.save();
-    res.json(blog);
+    
+    res.status(201).json({
+      success: true,
+      msg: "Blog created successfully",
+      blog
+    });
   } catch (err) {
-    console.error(err.message);
-    res.status(500).send("Server error");
+    console.error("Create blog error:", err);
+    
+    // Handle specific MongoDB validation errors
+    if (err.name === 'ValidationError') {
+      return res.status(400).json({
+        success: false,
+        msg: "Validation error",
+        errors: Object.values(err.errors).map(e => e.message)
+      });
+    }
+    
+    res.status(500).json({
+      success: false,
+      msg: "Server error while creating blog",
+      error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
+    });
   }
 };
 
@@ -62,27 +100,47 @@ exports.getBlogById = async (req, res) => {
 };
 // Edit blog
 exports.editBlog = async (req, res) => {
-  const { title, titleBackgroundImageUrl, content, tags } = req.body;
+  const { title, content, tags } = req.body;
   try {
     const blog = await Blog.findById(req.params.id);
     if (!blog) {
-      return res.status(404).json({ msg: "Blog is not found" });
+      return res.status(404).json({ 
+        success: false,
+        msg: "Blog not found" 
+      });
     }
     if (blog.author.toString() !== req.user.id) {
-      return res
-        .status(401)
-        .json({ msg: "User not authorized to edit this blog" });
+      return res.status(401).json({ 
+        success: false,
+        msg: "User not authorized to edit this blog" 
+      });
     }
-    blog.title = title || blog.title;
-    blog.titleBackgroundImageUrl = titleBackgroundImageUrl || blog.titleBackgroundImageUrl; // Update background image if provided
-    blog.content = content || blog.content;
-    blog.tags = tags || blog.tags;
-    blog.save();
+    
+    // Update fields if provided
+    if (title) blog.title = title;
+    if (content) blog.content = content;
+    if (tags) {
+      blog.tags = Array.isArray(tags) ? tags : tags.split(',').map(tag => tag.trim());
+    }
+    
+    // Only update image if new file is uploaded, otherwise keep existing
+    if (req.file) {
+      blog.titleBackgroundImageUrl = req.file.path;
+    }
+    
+    await blog.save();
 
-    return res.status(200).json({ msg: "Blog updated successfully", blog });
+    return res.status(200).json({ 
+      success: true,
+      msg: "Blog updated successfully", 
+      blog 
+    });
   } catch (error) {
-    console.error(error.message);
-    return res.status(500).send("Server error");
+    console.error("Edit blog error:", error.message);
+    return res.status(500).json({
+      success: false,
+      msg: "Server error while updating blog"
+    });
   }
 };
 
@@ -113,26 +171,33 @@ exports.searchBlogs = async (req, res) => {
 
   // Ensure the query is a string
   if (!query || typeof query !== "string") {
-    return res.status(400).json({ msg: "Invalid search query" });
+    return res.status(400).json({ 
+      success: false,
+      msg: "Invalid search query" 
+    });
   }
 
   try {
-    // Search by title or content
+    // Search by title or content (simplified)
     const blogs = await Blog.find({
       $or: [
         { title: { $regex: query, $options: "i" } }, // 'i' makes it case-insensitive
-        { "content.data.text": { $regex: query, $options: "i" } },
+        { content: { $regex: query, $options: "i" } },
       ],
+    }).populate("author", "name");
+
+    res.json({
+      success: true,
+      msg: `Found ${blogs.length} blog(s)`,
+      blogs,
+      total: blogs.length
     });
-
-    if (blogs.length === 0) {
-      return res.status(404).json({ msg: "No blogs found" });
-    }
-
-    res.json(blogs);
   } catch (err) {
-    console.error(err.message);
-    res.status(500).send("Server error in search blog");
+    console.error("Search blogs error:", err.message);
+    res.status(500).json({
+      success: false,
+      msg: "Server error while searching blogs"
+    });
   }
 };
 
@@ -166,7 +231,6 @@ exports.searchBlogs = async (req, res) => {
 // };
 
 exports.recommendBlogs = async (req, res) => {
-  console.log("FROM HERE");
   try {
     // Find the user and populate their liked and read blogs
     const user = await User.findById(req.user.id)
@@ -184,9 +248,6 @@ exports.recommendBlogs = async (req, res) => {
     // Create a unique set of all tags
     const allTags = [...new Set([...likedTags, ...readTags])];
 
-    console.log(likedTags);
-    console.log(readTags);
-    console.log(allTags);
 
     // Find blogs that match the tags but are not already read or liked by the user
     const recommendedBlogs = await Blog.find({
@@ -245,7 +306,6 @@ exports.addComment = async (req, res) => {
   }
 
   try {
-    console.log("i AM HERE FORM COMMENT");
     const blog = await Blog.findById(req.params.id);
 
     if (!blog) {
@@ -309,7 +369,6 @@ exports.deleteComment = async (req, res) => {
         .status(401)
         .json({ msg: "User not authorized to delete this comment" });
     }
-    console.log(comment);
     blog.comments.pull(comment._id);
     await blog.save();
 

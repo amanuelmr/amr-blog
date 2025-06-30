@@ -10,7 +10,6 @@ module.exports = async(req, res, next)=>{
     if(!token){
         return res.status(401).json({msg:'No token, authorization denied'})
     }
-    console.log("Access Token", token)
     try{
         const decoded = jwt.verify(token,process.env.ACCESS_TOKEN_SECRET);
        

@@ -22,6 +22,19 @@ const UserSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    verificationOTP: {
+      type: String,
+    },
+    verificationOTPExpiry: {
+      type: Date,
+    },
+    passwordResetOTP: {
+      type: String,
+    },
+    passwordResetOTPExpiry: {
+      type: Date,
+    },
+    // Legacy fields - keeping for backward compatibility
     verificationToken: {
       type: String,
     },

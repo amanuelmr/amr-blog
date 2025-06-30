@@ -10,6 +10,8 @@ const {
   forgotPassword,
   resetPassword,
   changePassword,
+  resendVerificationOTP,
+  debugSystemHealth,
 } = require("../controllers/authController");
 const authMiddleware = require("../middlewares/authMiddleware");
 
@@ -25,7 +27,7 @@ const authMiddleware = require("../middlewares/authMiddleware");
 *         - name
 *         - email
 *         - password
-*         - token
+*         - otp
 *         - oldPassword
 *         - newPassword
 *       properties:
@@ -38,9 +40,9 @@ const authMiddleware = require("../middlewares/authMiddleware");
 *         password:
 *           type: string
 *           description: The user's password
-*         token:
+*         otp:
 *           type: string
-*           description: The user's token for email verification and password reset
+*           description: 6-digit OTP code for email verification and password reset
 *         oldPassword:
 *           type: string
 *           description: The user's old password
@@ -58,7 +60,7 @@ const authMiddleware = require("../middlewares/authMiddleware");
  *   post:
  *     tags: [Authentication]
  *     summary: Register a new user
- *     description: This endpoint registers a new user.
+ *     description: This endpoint registers a new user and sends a 6-digit verification code to their email.
  *     requestBody:
  *       required: true
  *       content:
@@ -75,11 +77,12 @@ const authMiddleware = require("../middlewares/authMiddleware");
  *               password:
  *                 type: string
  *                 example: password123
+ *                 description: Password must be at least 8 characters
  *     responses:
  *       201:
- *         description: User registered successfully
+ *         description: User registered successfully, verification code sent to email
  *       400:
- *         description: User already exists
+ *         description: User already exists or validation error
  *       500:
  *         description: Server error
  */
@@ -120,24 +123,60 @@ router.post("/login", login);
  * /auth/verify-email:
  *   post:
  *     tags: [Authentication]
- *     summary: Verify email
- *     description: This endpoint verifies a user's email address.
- *     parameters:
- *       - in: query
- *         name: token
- *         schema:
- *           type: string
- *         required: true
- *         description: Email verification token
+ *     summary: Verify email with OTP
+ *     description: This endpoint verifies a user's email address using a 6-digit OTP code.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 example: john.doe@example.com
+ *               otp:
+ *                 type: string
+ *                 example: "123456"
+ *                 description: 6-digit verification code
  *     responses:
  *       200:
  *         description: Email verified successfully
  *       400:
- *         description: Invalid token
+ *         description: Invalid OTP, expired code, or user already verified
  *       500:
  *         description: Server error
  */
 router.post("/verify-email", verifyEmail);
+
+/**
+ * @swagger
+ * /auth/resend-verification-otp:
+ *   post:
+ *     tags: [Authentication]
+ *     summary: Resend email verification OTP
+ *     description: This endpoint resends a new 6-digit verification code to the user's email.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 example: john.doe@example.com
+ *     responses:
+ *       200:
+ *         description: New verification code sent to email
+ *       400:
+ *         description: User already verified
+ *       404:
+ *         description: User not found
+ *       500:
+ *         description: Server error
+ */
+router.post("/resend-verification-otp", resendVerificationOTP);
 
 /**
  * @swagger
@@ -185,8 +224,8 @@ router.post("/refresh-token", refreshToken);
  * /auth/forgot-password:
  *   post:
  *     tags: [Authentication]
- *     summary: Send forgot password email
- *     description: This endpoint sends an email to reset the user's password.
+ *     summary: Send password reset OTP
+ *     description: This endpoint sends a 6-digit OTP code to the user's email for password reset.
  *     requestBody:
  *       required: true
  *       content:
@@ -199,7 +238,7 @@ router.post("/refresh-token", refreshToken);
  *                 example: john.doe@example.com
  *     responses:
  *       200:
- *         description: Reset password link sent
+ *         description: Password reset code sent to email
  *       404:
  *         description: User not found
  *       500:
@@ -212,15 +251,8 @@ router.post("/forgot-password", forgotPassword);
  * /auth/reset-password:
  *   post:
  *     tags: [Authentication]
- *     summary: Reset password
- *     description: This endpoint resets the user's password.
- *     parameters:
- *       - in: query
- *         name: token
- *         schema:
- *           type: string
- *         required: true
- *         description: Reset password token
+ *     summary: Reset password with OTP
+ *     description: This endpoint resets the user's password using a 6-digit OTP code.
  *     requestBody:
  *       required: true
  *       content:
@@ -228,14 +260,22 @@ router.post("/forgot-password", forgotPassword);
  *           schema:
  *             type: object
  *             properties:
+ *               email:
+ *                 type: string
+ *                 example: john.doe@example.com
+ *               otp:
+ *                 type: string
+ *                 example: "123456"
+ *                 description: 6-digit password reset code
  *               password:
  *                 type: string
  *                 example: newpassword123
+ *                 description: New password (minimum 8 characters)
  *     responses:
  *       200:
  *         description: Password reset successfully
  *       400:
- *         description: Invalid token or missing password
+ *         description: Invalid OTP, expired code, or missing/invalid password
  *       500:
  *         description: Server error
  */
@@ -270,5 +310,20 @@ router.post("/reset-password", resetPassword);
  *         description: Server error
  */
 router.post("/change-password",authMiddleware, changePassword);
+
+/**
+ * @swagger
+ * /auth/debug/health:
+ *   get:
+ *     tags: [Authentication]
+ *     summary: System health check (Development only)
+ *     description: Check system health including environment variables, database connection, and email service.
+ *     responses:
+ *       200:
+ *         description: Health check completed
+ *       500:
+ *         description: Health check failed
+ */
+router.get("/debug/health", debugSystemHealth);
 
 module.exports = router;

@@ -3,15 +3,19 @@ const User = require("../models/User");
 exports.generateAccessTokenAndRefreshToken = async(userId) => {
     try {
         const user = await User.findById(userId);
-        const accessToken = user.generateAccessToken()
-        const refreshToken = user.generateRefreshToken()
-        user.refreshToken = refreshToken
+        if (!user) {
+            throw new Error("User not found");
+        }
 
-        await user.save({validateBeforeSave: false})
+        const accessToken = user.generateAccessToken();
+        const refreshToken = user.generateRefreshToken();
+        user.refreshToken = refreshToken;
 
+        await user.save({validateBeforeSave: false});
 
-        return {accessToken, refreshToken}
+        return {accessToken, refreshToken};
     } catch (error) {
-        return res.status(500).json({ msg: error.message });
+        console.error("Token generation error:", error);
+        throw new Error(`Failed to generate tokens: ${error.message}`);
     }
 }
