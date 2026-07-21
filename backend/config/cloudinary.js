@@ -11,19 +11,10 @@ cloudinary.config({
   secure: true
 });
 
-// Test Cloudinary connection
-async function testCloudinaryConnection() {
-  try {
-    await cloudinary.api.ping();
-  } catch (error) {
-    throw new Error('Cloudinary connection failed');
-  }
-}
-
 // Configure Cloudinary storage for multer
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
-  params: async (req, file) => {
+  params: async (_req, _file) => {
     return {
       folder: 'blog-title-images',
       allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
@@ -39,9 +30,6 @@ const storage = new CloudinaryStorage({
     };
   },
 });
-
-// Test connection on startup
-testCloudinaryConnection();
 
 // Create multer upload middleware
 const upload = multer({ 

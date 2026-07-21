@@ -1,15 +1,18 @@
 const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
 
-// Generate a 6-digit OTP
-const generateOTP = () => {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+// Generate a cryptographically-secure 6-digit OTP.
+// crypto.randomInt gives a uniform value in [0, 1000000) with no modulo bias.
+const generateSecureOTP = () => {
+  return crypto.randomInt(0, 1000000).toString().padStart(6, '0');
 };
 
-// Generate a more secure OTP using crypto
-const generateSecureOTP = () => {
-  const buffer = crypto.randomBytes(3);
-  const otp = parseInt(buffer.toString('hex'), 16) % 1000000;
-  return otp.toString().padStart(6, '0');
+// OTPs are stored hashed at rest so a DB leak does not expose active codes.
+const hashOTP = async (otp) => bcrypt.hash(otp, 10);
+
+const verifyOTP = async (otp, hash) => {
+  if (!hash) return false;
+  return bcrypt.compare(otp, hash);
 };
 
 // Check if OTP is expired (default 10 minutes)
@@ -27,8 +30,9 @@ const isValidOTPFormat = (otp) => {
 };
 
 module.exports = {
-  generateOTP,
   generateSecureOTP,
+  hashOTP,
+  verifyOTP,
   isOTPExpired,
   isValidOTPFormat
-}; 
+};

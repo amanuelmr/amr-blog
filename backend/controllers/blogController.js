@@ -1,5 +1,7 @@
 const Blog = require("../models/Blog");
 const User = require("../models/User");
+const escapeRegex = require("../utils/escapeRegex");
+const getPagination = require("../utils/pagination");
 
 // Create a blog
 exports.createBlog = async (req, res) => {
@@ -61,11 +63,26 @@ exports.createBlog = async (req, res) => {
 };
 
 
-// Get all blogs
+// Get all blogs (paginated)
 exports.getAllBlogs = async (req, res) => {
   try {
-    const blogs = await Blog.find().populate("author", "name");
-    res.json(blogs);
+    const { page, limit, skip } = getPagination(req.query);
+    const [blogs, total] = await Promise.all([
+      Blog.find()
+        .populate("author", "name")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      Blog.countDocuments(),
+    ]);
+
+    res.json({
+      blogs,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    });
   } catch (err) {
     console.error(err.message);
     res.status(500).send("Server error");
@@ -178,19 +195,34 @@ exports.searchBlogs = async (req, res) => {
   }
 
   try {
-    // Search by title or content (simplified)
-    const blogs = await Blog.find({
+    // Escape the user input so regex metacharacters are treated literally
+    // (prevents regex injection / ReDoS).
+    const safeQuery = escapeRegex(query.trim());
+    const filter = {
       $or: [
-        { title: { $regex: query, $options: "i" } }, // 'i' makes it case-insensitive
-        { content: { $regex: query, $options: "i" } },
+        { title: { $regex: safeQuery, $options: "i" } },
+        { content: { $regex: safeQuery, $options: "i" } },
       ],
-    }).populate("author", "name");
+    };
+
+    const { page, limit, skip } = getPagination(req.query);
+    const [blogs, total] = await Promise.all([
+      Blog.find(filter)
+        .populate("author", "name")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      Blog.countDocuments(filter),
+    ]);
 
     res.json({
       success: true,
-      msg: `Found ${blogs.length} blog(s)`,
+      msg: `Found ${total} blog(s)`,
       blogs,
-      total: blogs.length
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
     });
   } catch (err) {
     console.error("Search blogs error:", err.message);
@@ -201,35 +233,7 @@ exports.searchBlogs = async (req, res) => {
   }
 };
 
-// Recommend blogs
-// exports.recommendBlogs = async (req, res) => {
-//   try {
-//     const user = await User.findById(req.user.id);
-
-//     if (!user) {
-//       return res.status(404).json({ msg: "User not found" });
-//     }
-
-//     const likedBlogs = await Blog.find({ _id: { $in: user.likedBlogs } });
-//     const readBlogs = await Blog.find({ _id: { $in: user.readBlogs } });
-
-//     const likedTags = likedBlogs.flatMap((blog) => blog.tags);
-//     const readTags = readBlogs.flatMap((blog) => blog.tags);
-
-//     const allTags = [...new Set([...likedTags, ...readTags])];
-
-//     const recommendedBlogs = await Blog.find({
-//       tags: { $in: allTags },
-//       _id: { $nin: [...user.readBlogs, ...user.likedBlogs] },
-//     });
-
-//     res.json(recommendedBlogs);
-//   } catch (error) {
-//     console.error(error.message);
-//     res.status(500).send("Server error");
-//   }
-// };
-
+// Recommend blogs based on the tags of the user's liked and read blogs.
 exports.recommendBlogs = async (req, res) => {
   try {
     // Find the user and populate their liked and read blogs
@@ -250,10 +254,15 @@ exports.recommendBlogs = async (req, res) => {
 
 
     // Find blogs that match the tags but are not already read or liked by the user
+    const { limit, skip } = getPagination(req.query);
     const recommendedBlogs = await Blog.find({
       tags: { $in: allTags },
       _id: { $nin: [...user.readBlogs, ...user.likedBlogs] }, // Exclude already read or liked blogs
-    });
+    })
+      .populate("author", "name")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
 
     // Send recommended blogs
     res.json(recommendedBlogs);
@@ -271,6 +280,10 @@ exports.likeBlog = async (req, res) => {
 
     if (!blog) {
       return res.status(404).json({ msg: "Blog not found" });
+    }
+
+    if (!user) {
+      return res.status(404).json({ msg: "User not found" });
     }
 
     if (!user.likedBlogs.includes(req.params.id)) {
@@ -343,7 +356,18 @@ exports.getComments = async (req, res) => {
       return res.status(404).json({ msg: "Blog not found" });
     }
 
-    res.json(blog.comments);
+    // Comments are embedded, so paginate in memory.
+    const { page, limit, skip } = getPagination(req.query);
+    const total = blog.comments.length;
+    const comments = blog.comments.slice(skip, skip + limit);
+
+    res.json({
+      comments,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    });
   } catch (error) {
     console.error(error.message);
     res.status(500).send("Server error");
@@ -408,7 +432,7 @@ exports.editComment = async (req, res) => {
     }
 
     comment.text = text.trim();
-    comment.createdAt = Date.now();
+    comment.editedAt = Date.now();
 
     await blog.save();
 

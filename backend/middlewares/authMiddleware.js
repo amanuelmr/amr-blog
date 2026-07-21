@@ -11,18 +11,20 @@ module.exports = async(req, res, next)=>{
         return res.status(401).json({msg:'No token, authorization denied'})
     }
     try{
-        const decoded = jwt.verify(token,process.env.ACCESS_TOKEN_SECRET);
-       
-        const user = await User.findById(decoded._id).select('-password -refreshToken -verificationToken');
+        const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, {
+            algorithms: ["HS256"],
+        });
+
+        const user = await User.findById(decoded._id).select('-password -refreshToken');
 
         if(!user){
             return res.status(404).json({msg:'No user found'})
         }
         req.user = user
         next()
-    }catch(error){
-        // console.error(error.message)
-        res.status(401).json({msg:error.message})
+    }catch{
+        // Do not leak the underlying jwt error detail to the client.
+        res.status(401).json({msg:'Invalid or expired token'})
     }
 
     
