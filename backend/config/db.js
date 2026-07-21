@@ -1,13 +1,15 @@
 const mongoose = require("mongoose");
-require("dotenv").config();
 
+// Connect to MongoDB. Throws on failure so the caller can fail fast instead of
+// letting the app run against a dead database.
 const connectDB = async () => {
   const mongoURI = process.env.MONGODB_URI;
+  if (!mongoURI) {
+    throw new Error("MONGODB_URI is not set");
+  }
 
-  mongoose
-    .connect(mongoURI)
-    .then(() => console.log("MongoDB connected"))
-    .catch((err) => console.error("MongoDB connection error:", err));
+  await mongoose.connect(mongoURI);
+  console.log("MongoDB connected");
 };
 
 module.exports = connectDB;

@@ -1,38 +1,21 @@
 const User = require("../models/User");
-const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const nodemailer = require("nodemailer");
 require("dotenv").config();
-const { z } = require("zod");
 
 const {
   generateAccessTokenAndRefreshToken,
 } = require("../utils/generateAccessTokenAndRefreshToken");
 
-const { 
-  generateSecureOTP, 
-  isOTPExpired, 
-  isValidOTPFormat 
+const {
+  generateSecureOTP,
+  hashOTP,
+  verifyOTP,
+  isOTPExpired,
+  isValidOTPFormat
 } = require("../utils/otpUtils");
 
 const { getEmailTemplate } = require("../utils/emailTemplates");
-
-// Validate required environment variables
-const requiredEnvVars = [
-  'JWT_SECRET',
-  'ACCESS_TOKEN_SECRET', 
-  'REFRESH_TOKEN_SECRET',
-  'EMAIL',
-  'PASSWORD'
-];
-
-const validateEnvVars = () => {
-  const missing = requiredEnvVars.filter(varName => !process.env[varName]);
-  if (missing.length > 0) {
-    console.error('Missing required environment variables:', missing);
-    throw new Error(`Missing environment variables: ${missing.join(', ')}`);
-  }
-};
 
 const emailerTransporter = nodemailer.createTransport({
   service: "gmail",
@@ -45,33 +28,11 @@ const emailerTransporter = nodemailer.createTransport({
   },
 });
 
-const userSchema = z.object({
-  name: z.string().min(3).max(255),
-  email: z.string().email(),
-  password: z.string().min(8).max(255),
-});
-
 exports.register = async (req, res) => {
+  // Input is validated by the `validate(registerSchema)` route middleware.
   const { name, email, password } = req.body;
 
   try {
-    // Validate environment variables first
-    validateEnvVars();
-
-    // Validate the user input
-    try {
-      userSchema.parse({ name, email, password });
-    } catch (validationError) {
-      return res.status(400).json({
-        success: false,
-        msg: "Invalid input data",
-        errors: validationError.errors?.map(err => ({
-          field: err.path[0],
-          message: err.message
-        })) || [validationError.message]
-      });
-    }
-
     // Check if the user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
@@ -88,12 +49,15 @@ exports.register = async (req, res) => {
       password,
     });
 
-    // Generate OTP for email verification
+    // Generate OTP for email verification (stored hashed, emailed in plaintext)
     const verificationOTP = generateSecureOTP();
-    user.verificationOTP = verificationOTP;
+    user.verificationOTP = await hashOTP(verificationOTP);
     user.verificationOTPExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
-    // Send verification email with OTP
+    // Persist the user first so a failed email never leaves an OTP without an account
+    await user.save();
+
+    // Send verification email with the plaintext OTP
     try {
       const emailTemplate = getEmailTemplate('emailVerification', {
         name: user.name,
@@ -112,12 +76,9 @@ exports.register = async (req, res) => {
       console.error("Email sending failed:", emailError);
       return res.status(500).json({
         success: false,
-        msg: "Failed to send verification email. Please try again.",
+        msg: "Account created, but the verification email could not be sent. Please request a new code.",
       });
     }
-
-    // Save user to database
-    await user.save();
 
     // Get user data without sensitive information
     const createdUser = await User.findById(user._id).select(
@@ -209,7 +170,7 @@ exports.login = async (req, res) => {
 
     // Get user data without sensitive information
     const loggedInUser = await User.findById(user._id).select(
-      "-password -refreshToken -verificationOTP -verificationOTPExpiry -passwordResetOTP -passwordResetOTPExpiry -verificationToken -forgetPasswordToken"
+      "-password -refreshToken -verificationOTP -verificationOTPExpiry -passwordResetOTP -passwordResetOTPExpiry"
     );
 
     if (!loggedInUser) {
@@ -227,6 +188,8 @@ exports.login = async (req, res) => {
       maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
     };
 
+    // Tokens are delivered ONLY as httpOnly cookies and deliberately not in the
+    // JSON body, so they are never exposed to client-side JavaScript / XSS.
     return res
       .status(200)
       .cookie("accessToken", accessToken, options)
@@ -235,8 +198,6 @@ exports.login = async (req, res) => {
         success: true,
         msg: "Logged in successfully",
         user: loggedInUser,
-        accessToken,
-        refreshToken,
       });
 
   } catch (error) {
@@ -303,11 +264,12 @@ exports.verifyEmail = async (req, res) => {
       });
     }
 
-    // Check if OTP matches
-    if (user.verificationOTP !== otp) {
-      return res.status(400).json({ 
+    // Check if OTP matches (stored hashed)
+    const otpMatches = await verifyOTP(otp, user.verificationOTP);
+    if (!otpMatches) {
+      return res.status(400).json({
         success: false,
-        msg: "Invalid verification code" 
+        msg: "Invalid verification code"
       });
     }
 
@@ -383,9 +345,10 @@ exports.logout = async (req, res) => {
       },
       { new: true }
     );
-    options = {
+    const options = {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
     };
     return res
       .status(200)
@@ -393,7 +356,8 @@ exports.logout = async (req, res) => {
       .clearCookie("refreshToken", options)
       .json({ user: {}, msg: "Logged out successfully" });
   } catch (error) {
-    res.status(500).json({ msg: error.message });
+    console.error("Logout error:", error.message);
+    res.status(500).json({ msg: "Failed to log out. Please try again." });
   }
 };
 
@@ -422,15 +386,19 @@ exports.refreshToken = async (req, res) => {
     const options = {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     };
 
+    // Cookie-only: tokens are not returned in the JSON body.
     return res
       .status(200)
       .cookie("accessToken", accessToken, options)
       .cookie("refreshToken", refreshToken, options)
-      .json({ accessToken, refreshToken, msg: "Token refreshed successfully" });
+      .json({ msg: "Token refreshed successfully" });
   } catch (error) {
-    return res.status(500).json({ msg: error.message });
+    console.error("Refresh token error:", error.message);
+    return res.status(401).json({ msg: "Invalid or expired token" });
   }
 };
 
@@ -443,15 +411,18 @@ exports.forgotPassword = async (req, res) => {
       return res.status(404).json({ msg: "User not found" });
     }
 
-    // Generate OTP for password reset
+    // Generate OTP for password reset (stored hashed, emailed in plaintext)
     const passwordResetOTP = generateSecureOTP();
-    user.passwordResetOTP = passwordResetOTP;
+    user.passwordResetOTP = await hashOTP(passwordResetOTP);
     user.passwordResetOTPExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+
+    // Persist the OTP before sending the email
+    await user.save();
 
     // Get user's IP address for security
     const userIp = req.ip || req.connection.remoteAddress || req.socket.remoteAddress;
 
-    // Send password reset email with OTP
+    // Send password reset email with the plaintext OTP
     const emailTemplate = getEmailTemplate('passwordReset', {
       name: user.name,
       otp: passwordResetOTP,
@@ -466,30 +437,18 @@ exports.forgotPassword = async (req, res) => {
     };
 
     await emailerTransporter.sendMail(mailOptions);
-    await user.save();
 
     return res.status(200).json({ msg: "Password reset code sent to your email" });
 
   } catch (error) {
     console.error('Forgot password error:', error.message);
-    res.status(500).send({msg: error.message});
+    res.status(500).json({ msg: "Failed to process the request. Please try again." });
   }
 }
 
 exports.resetPassword = async (req, res) => {
+  // Input is validated by the `validate(resetPasswordSchema)` route middleware.
   const { email, otp, password } = req.body;
-  
-  if (!email || !otp || !password) {
-    return res.status(400).json({ msg: 'Email, OTP, and new password are required' });
-  }
-
-  if (!isValidOTPFormat(otp)) {
-    return res.status(400).json({ msg: "Invalid OTP format. Please enter a 6-digit code." });
-  }
-
-  if (password.length < 8) {
-    return res.status(400).json({ msg: 'Password must be at least 8 characters long' });
-  }
 
   try {
     const user = await User.findOne({ email });
@@ -502,8 +461,9 @@ exports.resetPassword = async (req, res) => {
       return res.status(400).json({ msg: "No password reset code found. Please request a new one." });
     }
 
-    // Check if OTP matches
-    if (user.passwordResetOTP !== otp) {
+    // Check if OTP matches (stored hashed)
+    const otpMatches = await verifyOTP(otp, user.passwordResetOTP);
+    if (!otpMatches) {
       return res.status(400).json({ msg: "Invalid reset code" });
     }
 
@@ -537,7 +497,7 @@ exports.resetPassword = async (req, res) => {
 
   } catch (error) {
     console.error('Reset password error:', error);
-    return res.status(500).json({ msg: error.message });
+    return res.status(500).json({ msg: "Failed to reset password. Please try again." });
   }
 }
 
@@ -559,12 +519,15 @@ exports.resendVerificationOTP = async (req, res) => {
       return res.status(400).json({ msg: 'User is already verified' });
     }
 
-    // Generate new OTP
+    // Generate new OTP (stored hashed, emailed in plaintext)
     const verificationOTP = generateSecureOTP();
-    user.verificationOTP = verificationOTP;
+    user.verificationOTP = await hashOTP(verificationOTP);
     user.verificationOTPExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
-    // Send verification email with OTP
+    // Persist the OTP before sending the email
+    await user.save();
+
+    // Send verification email with the plaintext OTP
     const emailTemplate = getEmailTemplate('emailVerification', {
       name: user.name,
       otp: verificationOTP
@@ -578,12 +541,11 @@ exports.resendVerificationOTP = async (req, res) => {
     };
 
     await emailerTransporter.sendMail(mailOptions);
-    await user.save();
 
     return res.status(200).json({ msg: 'New verification code sent to your email' });
   } catch (error) {
     console.error('Resend OTP error:', error);
-    return res.status(500).json({ msg: error.message });
+    return res.status(500).json({ msg: "Failed to resend verification code. Please try again." });
   }
 };
 
@@ -607,7 +569,7 @@ exports.debugSystemHealth = async (req, res) => {
 
     // Test database connection
     try {
-      const testUser = await User.findOne().limit(1);
+      await User.findOne();
       healthCheck.database = 'connected';
     } catch (dbError) {
       healthCheck.database = `error: ${dbError.message}`;
@@ -690,7 +652,7 @@ exports.changePassword = async (req, res) => {
     console.error("Change password error:", error);
     return res.status(500).json({
       success: false,
-      msg: error.message
+      msg: "Failed to change password. Please try again."
     })
   }
 }

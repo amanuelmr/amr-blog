@@ -30,8 +30,11 @@
 
 const express = require('express');
 const router = express.Router();
-const BlogController = require('../controllers/blogController');
+const { wrapAll } = require('../utils/asyncHandler');
+const BlogController = wrapAll(require('../controllers/blogController'));
 const authMiddleware = require('../middlewares/authMiddleware');
+const validate = require('../middlewares/validate');
+const { createBlogSchema, editBlogSchema, commentSchema } = require('../validators/blogValidators');
 const { upload, cloudinary } = require('../config/cloudinary');
 
 /**
@@ -78,25 +81,27 @@ const { upload, cloudinary } = require('../config/cloudinary');
  *       500:
  *         description: Server error
  */
-// Test endpoint for Cloudinary configuration
-router.get('/test-cloudinary', async (req, res) => {
-  try {
-    const result = await cloudinary.api.ping();
-    res.json({
-      success: true,
-      msg: 'Cloudinary connection successful',
-      result
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      msg: 'Cloudinary connection failed',
-      error: error.message
-    });
-  }
-});
+// Test endpoint for Cloudinary configuration.
+// Only registered outside production to avoid exposing service diagnostics.
+if (process.env.NODE_ENV !== 'production') {
+  router.get('/test-cloudinary', async (req, res) => {
+    try {
+      const result = await cloudinary.api.ping();
+      res.json({
+        success: true,
+        msg: 'Cloudinary connection successful',
+        result
+      });
+    } catch {
+      res.status(500).json({
+        success: false,
+        msg: 'Cloudinary connection failed'
+      });
+    }
+  });
+}
 
-router.post('/create', authMiddleware, upload.single('titleBackgroundImage'), BlogController.createBlog);
+router.post('/create', authMiddleware, upload.single('titleBackgroundImage'), validate(createBlogSchema), BlogController.createBlog);
 
 /**
  * @swagger
@@ -216,7 +221,7 @@ router.get('/:id', BlogController.getBlogById);
  *       404:
  *         description: Blog not found
  */
-router.put('/:id', authMiddleware, upload.single('titleBackgroundImage'), BlogController.editBlog);
+router.put('/:id', authMiddleware, upload.single('titleBackgroundImage'), validate(editBlogSchema), BlogController.editBlog);
 
 /**
  * @swagger
@@ -297,7 +302,7 @@ router.post('/:id/like', authMiddleware, BlogController.likeBlog);
  *       401:
  *         description: Unauthorized
  */
-router.post('/:id/comments', authMiddleware, BlogController.addComment);
+router.post('/:id/comments', authMiddleware, validate(commentSchema), BlogController.addComment);
 
 /**
  * @swagger
@@ -388,6 +393,6 @@ router.delete('/:id/comments/:commentId', authMiddleware, BlogController.deleteC
  *       404:
  *         description: Comment not found
  */
-router.put('/:id/comments/:commentId', authMiddleware, BlogController.editComment);
+router.put('/:id/comments/:commentId', authMiddleware, validate(commentSchema), BlogController.editComment);
 
 module.exports = router;

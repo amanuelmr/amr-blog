@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { check } = require("express-validator");
+const { wrapAll } = require("../utils/asyncHandler");
 const {
   register,
   login,
@@ -12,8 +12,19 @@ const {
   changePassword,
   resendVerificationOTP,
   debugSystemHealth,
-} = require("../controllers/authController");
+} = wrapAll(require("../controllers/authController"));
 const authMiddleware = require("../middlewares/authMiddleware");
+const validate = require("../middlewares/validate");
+const { authLimiter } = require("../middlewares/rateLimiters");
+const {
+  registerSchema,
+  loginSchema,
+  verifyEmailSchema,
+  resendVerificationSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
+  changePasswordSchema,
+} = require("../validators/authValidators");
 
 
 
@@ -86,7 +97,7 @@ const authMiddleware = require("../middlewares/authMiddleware");
  *       500:
  *         description: Server error
  */
-router.post("/register", register);
+router.post("/register", authLimiter, validate(registerSchema), register);
 
 /**
  * @swagger
@@ -116,7 +127,7 @@ router.post("/register", register);
  *       500:
  *         description: Server error
  */
-router.post("/login", login);
+router.post("/login", authLimiter, validate(loginSchema), login);
 
 /**
  * @swagger
@@ -147,7 +158,7 @@ router.post("/login", login);
  *       500:
  *         description: Server error
  */
-router.post("/verify-email", verifyEmail);
+router.post("/verify-email", authLimiter, validate(verifyEmailSchema), verifyEmail);
 
 /**
  * @swagger
@@ -176,7 +187,7 @@ router.post("/verify-email", verifyEmail);
  *       500:
  *         description: Server error
  */
-router.post("/resend-verification-otp", resendVerificationOTP);
+router.post("/resend-verification-otp", authLimiter, validate(resendVerificationSchema), resendVerificationOTP);
 
 /**
  * @swagger
@@ -217,7 +228,7 @@ router.post("/logout", authMiddleware, logout);
  *       500:
  *         description: Server error
  */
-router.post("/refresh-token", refreshToken);
+router.post("/refresh-token", authLimiter, refreshToken);
 
 /**
  * @swagger
@@ -244,7 +255,7 @@ router.post("/refresh-token", refreshToken);
  *       500:
  *         description: Server error
  */
-router.post("/forgot-password", forgotPassword);
+router.post("/forgot-password", authLimiter, validate(forgotPasswordSchema), forgotPassword);
 
 /**
  * @swagger
@@ -279,7 +290,7 @@ router.post("/forgot-password", forgotPassword);
  *       500:
  *         description: Server error
  */
-router.post("/reset-password", resetPassword);
+router.post("/reset-password", authLimiter, validate(resetPasswordSchema), resetPassword);
 
 /**
  * @swagger
@@ -309,7 +320,7 @@ router.post("/reset-password", resetPassword);
  *       500:
  *         description: Server error
  */
-router.post("/change-password",authMiddleware, changePassword);
+router.post("/change-password", authMiddleware, validate(changePasswordSchema), changePassword);
 
 /**
  * @swagger
@@ -324,6 +335,10 @@ router.post("/change-password",authMiddleware, changePassword);
  *       500:
  *         description: Health check failed
  */
-router.get("/debug/health", debugSystemHealth);
+// Debug/health endpoint exposes config presence and service status.
+// Only registered outside production to avoid information disclosure.
+if (process.env.NODE_ENV !== "production") {
+  router.get("/debug/health", debugSystemHealth);
+}
 
 module.exports = router;

@@ -1,4 +1,18 @@
-const getEmailTemplate = (type, data) => {
+// Escape user-controlled values before interpolating them into HTML emails
+// to prevent HTML/markup injection (e.g. via a crafted display name).
+const escapeHtml = (value) =>
+  String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
+const getEmailTemplate = (type, rawData) => {
+  // Escape every incoming field so templates can interpolate safely.
+  const data = Object.fromEntries(
+    Object.entries(rawData || {}).map(([key, value]) => [key, escapeHtml(value)])
+  );
   const baseStyle = `
     <style>
       .email-container {

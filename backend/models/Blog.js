@@ -4,7 +4,8 @@ const mongoose = require("mongoose");
 const commentSchema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }, // Reference to the user who commented
   text: { type: String, required: true }, // The comment text
-  createdAt: { type: Date, default: Date.now }
+  createdAt: { type: Date, default: Date.now },
+  editedAt: { type: Date } // Set when a comment is edited; createdAt stays intact
 });
 
 const blogSchema = new mongoose.Schema({
