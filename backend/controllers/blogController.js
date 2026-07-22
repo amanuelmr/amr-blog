@@ -1,8 +1,10 @@
+const mongoose = require("mongoose");
 const Blog = require("../models/Blog");
 const User = require("../models/User");
 const escapeRegex = require("../utils/escapeRegex");
 const getPagination = require("../utils/pagination");
 const sanitizeContent = require("../utils/sanitizeContent");
+const { makeSlug } = require("../utils/slugify");
 
 // Create a blog
 exports.createBlog = async (req, res) => {
@@ -35,6 +37,8 @@ exports.createBlog = async (req, res) => {
       author: req.user.id,
     });
 
+    // Stable, unique, human-readable URL slug derived from the title.
+    blog.slug = makeSlug(title, blog._id);
 
     await blog.save();
     
@@ -90,19 +94,31 @@ exports.getAllBlogs = async (req, res) => {
   }
 };
 
-// Get a blog by ID
+// Get a blog by slug (preferred) or by Mongo id (backward compatible).
 exports.getBlogById = async (req, res) => {
   try {
-    const blog = await Blog.findById(req.params.id).populate("author", "name");
+    const { id } = req.params;
+    let blog = await Blog.findOne({ slug: id }).populate("author", "name");
+    if (!blog && mongoose.isValidObjectId(id)) {
+      blog = await Blog.findById(id).populate("author", "name");
+    }
 
     if (!blog) {
       return res.status(404).json({ msg: "Blog not found" });
     }
 
+    // Backfill a slug for posts created before slugs existed, so their links
+    // become pretty from the first view onward.
+    if (!blog.slug) {
+      blog.slug = makeSlug(blog.title, blog._id);
+      await blog.save();
+    }
+
     if (req.user) {
       const user = await User.findById(req.user.id);
-      if (user && !user.readBlogs.includes(req.params.id)) {
-        user.readBlogs.push(req.params.id);
+      const already = user?.readBlogs?.some((b) => b.toString() === blog._id.toString());
+      if (user && !already) {
+        user.readBlogs.push(blog._id);
         await user.save();
       }
     }
@@ -110,9 +126,6 @@ exports.getBlogById = async (req, res) => {
     res.json(blog);
   } catch (err) {
     console.error(err.message);
-    if (err.kind === "ObjectId") {
-      return res.status(404).json({ msg: "Blog not found" });
-    }
     res.status(500).send("Server error");
   }
 };
@@ -145,7 +158,12 @@ exports.editBlog = async (req, res) => {
     if (req.file) {
       blog.titleBackgroundImageUrl = req.file.path;
     }
-    
+
+    // Keep the slug stable across edits (link permanence); backfill if missing.
+    if (!blog.slug) {
+      blog.slug = makeSlug(blog.title, blog._id);
+    }
+
     await blog.save();
 
     return res.status(200).json({ 

@@ -24,6 +24,7 @@ export interface Comment {
 
 export interface Blog {
   _id: string;
+  slug?: string;
   title: string;
   content: string;
   titleBackgroundImageUrl?: string | null;

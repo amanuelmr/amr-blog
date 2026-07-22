@@ -54,6 +54,18 @@ describe('Blog API', () => {
       const res = await request(app).get(`/api/v1/blogs/${id}`).expect(200);
       expect(res.body._id).toBe(id);
     });
+
+    it('generates a slug and resolves the blog by slug', async () => {
+      const agent = request.agent(app);
+      await registerVerifyLogin(agent);
+      const created = await createBlog(agent, { title: 'My First Blog' }).expect(201);
+      const slug = created.body.blog.slug;
+
+      expect(slug).toMatch(/^my-first-blog-[a-f0-9]{6}$/);
+
+      const res = await request(app).get(`/api/v1/blogs/${slug}`).expect(200);
+      expect(res.body._id).toBe(created.body.blog._id);
+    });
   });
 
   describe('authorization', () => {
