@@ -295,7 +295,7 @@ exports.verifyEmail = async (req, res) => {
     try {
       const welcomeTemplate = getEmailTemplate('welcome', {
         name: user.name,
-        loginUrl: 'http://localhost:3000/login'
+        loginUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/login`
       });
 
       const mailOptions = {

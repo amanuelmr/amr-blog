@@ -35,7 +35,7 @@ const BlogController = wrapAll(require('../controllers/blogController'));
 const authMiddleware = require('../middlewares/authMiddleware');
 const validate = require('../middlewares/validate');
 const { createBlogSchema, editBlogSchema, commentSchema } = require('../validators/blogValidators');
-const { upload, cloudinary } = require('../config/cloudinary');
+const { upload, uploadContent, cloudinary } = require('../config/cloudinary');
 
 /**
  * @swagger
@@ -102,6 +102,34 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 router.post('/create', authMiddleware, upload.single('titleBackgroundImage'), validate(createBlogSchema), BlogController.createBlog);
+
+/**
+ * @swagger
+ * /blogs/upload-image:
+ *   post:
+ *     summary: Upload an inline image for the rich-text editor
+ *     tags: [Blogs]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               image:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       201:
+ *         description: Image uploaded; returns its hosted URL
+ *       400:
+ *         description: No image uploaded
+ *       401:
+ *         description: Unauthorized
+ */
+router.post('/upload-image', authMiddleware, uploadContent.single('image'), BlogController.uploadImage);
 
 /**
  * @swagger

@@ -7,6 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import { ApiError } from "@/lib/api";
 import { AuthCard, FormAlert } from "@/components/AuthCard";
 import { Label, Input } from "@/components/ui/Field";
+import { OtpInput } from "@/components/ui/OtpInput";
 import { Button } from "@/components/ui/Button";
 
 export function VerifyEmailForm() {
@@ -65,12 +66,10 @@ export function VerifyEmailForm() {
             onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
         </div>
         <div>
-          <Label htmlFor="otp">Verification code</Label>
-          <Input id="otp" inputMode="numeric" pattern="\d{6}" maxLength={6} required
-            value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
-            placeholder="123456" className="text-center text-lg tracking-[0.4em]" />
+          <Label>Verification code</Label>
+          <OtpInput value={otp} onChange={setOtp} autoFocus />
         </div>
-        <Button type="submit" loading={loading} className="mt-1 w-full">
+        <Button type="submit" loading={loading} disabled={otp.length < 6} className="mt-1 w-full">
           Verify email
         </Button>
       </form>

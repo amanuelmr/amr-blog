@@ -51,16 +51,59 @@ body {
 }
 
 /* Long-form article body: serif, comfortable measure */
-.article-body {
-  font-family: "Iowan Old Style", "Charter", Georgia, ui-serif, serif;
-  font-size: 1.175rem;
-  line-height: 1.75;
-}
-.article-body p { margin: 0 0 1.3em; }
-.article-body p:last-child { margin-bottom: 0; }
-
 @layer utilities {
   .text-balance { text-wrap: balance; }
+}
+
+/* Tighten prose rhythm (applies to the editor and the article).
+   @tailwindcss/typography uses :where() (0 specificity), so these plain
+   `.prose x` rules win and give denser paragraph/list spacing. */
+.prose p {
+  margin-top: 0.7em;
+  margin-bottom: 0.7em;
+}
+.prose ul,
+.prose ol {
+  margin-top: 0.7em;
+  margin-bottom: 0.7em;
+  padding-left: 1.4em;
+}
+.prose li {
+  margin-top: 0.15em;
+  margin-bottom: 0.15em;
+}
+.prose li > p {
+  margin-top: 0.15em;
+  margin-bottom: 0.15em;
+}
+.prose h1,
+.prose h2,
+.prose h3 {
+  margin-top: 1.1em;
+  margin-bottom: 0.45em;
+}
+.prose blockquote {
+  margin-top: 0.9em;
+  margin-bottom: 0.9em;
+}
+.prose > :first-child {
+  margin-top: 0;
+}
+
+/* Tiptap editor: focus + placeholder */
+.ProseMirror {
+  outline: none;
+}
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: rgb(var(--muted));
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+.ProseMirror img {
+  max-width: 100%;
+  height: auto;
 }
 
 :focus-visible {

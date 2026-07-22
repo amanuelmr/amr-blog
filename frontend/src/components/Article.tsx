@@ -12,7 +12,8 @@ import { TagChip } from "./TagChip";
 import { LikeButton } from "./LikeButton";
 import { CommentSection } from "./CommentSection";
 import { Spinner, ErrorState } from "./states";
-import { formatDate, readingTime } from "@/lib/format";
+import { formatDate, readingTime, contentToHtml } from "@/lib/format";
+import DOMPurify from "isomorphic-dompurify";
 
 export function Article({ id }: { id: string }) {
   const { user } = useAuth();
@@ -63,7 +64,9 @@ export function Article({ id }: { id: string }) {
     );
 
   const isOwner = !!user && !!blog.author && blog.author._id === user._id;
-  const paragraphs = blog.content.split(/\n{1,}/).map((p) => p.trim()).filter(Boolean);
+  // Content is sanitized server-side on save; sanitize again here (DOMPurify)
+  // as defense-in-depth before injecting it into the DOM.
+  const html = DOMPurify.sanitize(contentToHtml(blog.content));
 
   return (
     <article className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
@@ -118,13 +121,10 @@ export function Article({ id }: { id: string }) {
         </div>
       )}
 
-      <div className="article-body mt-10">
-        {paragraphs.length > 0 ? (
-          paragraphs.map((p, i) => <p key={i}>{p}</p>)
-        ) : (
-          <p>{blog.content}</p>
-        )}
-      </div>
+      <div
+        className="prose prose-stone dark:prose-invert prose-lg mt-10 max-w-none prose-a:text-accent prose-img:rounded-xl"
+        dangerouslySetInnerHTML={{ __html: html }}
+      />
 
       <div className="mt-10 flex items-center gap-4 border-t border-border pt-6">
         <LikeButton blogId={blog._id} initialLikes={blog.likes ?? []} />
