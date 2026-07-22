@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { API_ORIGIN } from "@/lib/api";
 
 export function Footer() {
   return (
@@ -8,7 +9,7 @@ export function Footer() {
         <nav className="flex items-center gap-5">
           <Link href="/" className="hover:text-fg">Home</Link>
           <Link href="/write" className="hover:text-fg">Write</Link>
-          <a href="http://localhost:5000/swagger-ui" className="hover:text-fg" target="_blank" rel="noreferrer">API</a>
+          <a href={`${API_ORIGIN}/swagger-ui`} className="hover:text-fg" target="_blank" rel="noreferrer">API</a>
         </nav>
       </div>
     </footer>
