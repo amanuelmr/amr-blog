@@ -7,6 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import { ApiError } from "@/lib/api";
 import { AuthCard, FormAlert } from "@/components/AuthCard";
 import { Label, Input } from "@/components/ui/Field";
+import { OtpInput } from "@/components/ui/OtpInput";
 import { Button } from "@/components/ui/Button";
 
 export function ResetPasswordForm() {
@@ -50,10 +51,8 @@ export function ResetPasswordForm() {
             onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
         </div>
         <div>
-          <Label htmlFor="otp">Reset code</Label>
-          <Input id="otp" inputMode="numeric" pattern="\d{6}" maxLength={6} required
-            value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
-            placeholder="123456" className="text-center text-lg tracking-[0.4em]" />
+          <Label>Reset code</Label>
+          <OtpInput value={otp} onChange={setOtp} autoFocus />
         </div>
         <div>
           <Label htmlFor="password">New password</Label>

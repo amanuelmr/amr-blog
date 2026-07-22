@@ -38,8 +38,25 @@ const config: Config = {
       animation: {
         "fade-up": "fade-up 0.4s cubic-bezier(0.2,0.7,0.3,1) both",
       },
+      typography: {
+        DEFAULT: {
+          css: {
+            fontFamily:
+              '"Iowan Old Style", Charter, Georgia, ui-serif, serif',
+            code: {
+              fontFamily: "var(--font-geist-mono), ui-monospace, monospace",
+              fontWeight: "500",
+            },
+            "code::before": { content: '""' },
+            "code::after": { content: '""' },
+            pre: {
+              fontFamily: "var(--font-geist-mono), ui-monospace, monospace",
+            },
+          },
+        },
+      },
     },
   },
-  plugins: [],
+  plugins: [require("@tailwindcss/typography")],
 };
 export default config;

@@ -24,9 +24,41 @@ export function relativeTime(iso?: string): string {
   return formatDate(iso);
 }
 
-/** Estimated reading time from plain-text content (~200 wpm). */
+/** Strip HTML tags and decode a few common entities to plain text. */
+export function stripHtml(html: string): string {
+  return (html || "")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Normalize stored content to HTML for rendering. New posts are already HTML
+ * (from the editor, sanitized server-side); legacy posts are plain text with
+ * newlines — wrap those into paragraphs so they render correctly.
+ */
+export function contentToHtml(content: string): string {
+  const looksLikeHtml = /<\/?[a-z][\s\S]*>/i.test(content || "");
+  if (looksLikeHtml) return content;
+  const esc = (s: string) =>
+    s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return (content || "")
+    .split(/\n{2,}/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map((p) => `<p>${esc(p).replace(/\n/g, "<br>")}</p>`)
+    .join("");
+}
+
+/** Estimated reading time (~200 wpm), HTML-safe. */
 export function readingTime(content: string): number {
-  const words = content.trim().split(/\s+/).filter(Boolean).length;
+  const words = stripHtml(content).split(/\s+/).filter(Boolean).length;
   return Math.max(1, Math.round(words / 200));
 }
 
@@ -40,9 +72,9 @@ export function initials(name?: string): string {
     .join("");
 }
 
-/** Deterministic excerpt from plain-text content. */
+/** Deterministic plain-text excerpt from (possibly HTML) content. */
 export function excerpt(content: string, max = 160): string {
-  const clean = content.replace(/\s+/g, " ").trim();
+  const clean = stripHtml(content);
   if (clean.length <= max) return clean;
   return clean.slice(0, max).replace(/\s+\S*$/, "") + "…";
 }
