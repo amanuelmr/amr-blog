@@ -1,20 +1,5 @@
 import Image from "next/image";
 
-// Deterministic gradient fallback when a post has no cover image.
-const gradients = [
-  "from-teal-500/25 to-indigo-500/25",
-  "from-rose-500/25 to-amber-500/25",
-  "from-sky-500/25 to-emerald-500/25",
-  "from-fuchsia-500/25 to-cyan-500/25",
-  "from-amber-500/25 to-rose-500/25",
-];
-
-function pick(seed: string) {
-  let n = 0;
-  for (let i = 0; i < seed.length; i++) n = (n + seed.charCodeAt(i)) % gradients.length;
-  return gradients[n];
-}
-
 export function CoverImage({
   src,
   title,
@@ -38,14 +23,16 @@ export function CoverImage({
       />
     );
   }
+  // Refined neutral fallback — a quiet typographic mark, no candy gradients.
   return (
     <div
-      className={`flex h-full w-full items-center justify-center bg-gradient-to-br ${pick(title)}`}
+      className="relative flex h-full w-full items-center justify-center overflow-hidden bg-subtle"
       aria-hidden="true"
     >
-      <span className="select-none font-serif text-5xl font-bold text-fg/25">
+      <span className="select-none font-serif text-6xl font-bold text-fg/[0.08]">
         {title.trim()[0]?.toUpperCase() ?? "A"}
       </span>
+      <span className="absolute inset-0 bg-gradient-to-br from-fg/[0.015] to-transparent" />
     </div>
   );
 }
