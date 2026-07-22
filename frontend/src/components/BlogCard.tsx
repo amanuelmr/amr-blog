@@ -3,12 +3,13 @@ import { Blog } from "@/lib/types";
 import { CoverImage } from "./CoverImage";
 import { Avatar } from "./Avatar";
 import { TagChip } from "./TagChip";
-import { formatDate, readingTime, excerpt } from "@/lib/format";
+import { formatDate, readingTime, excerpt, blogHref } from "@/lib/format";
 
 export function BlogCard({ blog }: { blog: Blog }) {
+  const href = blogHref(blog);
   return (
     <article className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card transition-shadow hover:shadow-lg hover:shadow-black/5">
-      <Link href={`/blog/${blog._id}`} className="relative block aspect-[16/10] overflow-hidden bg-subtle">
+      <Link href={href} className="relative block aspect-[16/10] overflow-hidden bg-subtle">
         <div className="h-full w-full transition-transform duration-500 group-hover:scale-105">
           <CoverImage src={blog.titleBackgroundImageUrl} title={blog.title} />
         </div>
@@ -24,7 +25,7 @@ export function BlogCard({ blog }: { blog: Blog }) {
         )}
 
         <h3 className="text-balance text-lg font-semibold leading-snug">
-          <Link href={`/blog/${blog._id}`} className="transition-colors group-hover:text-accent">
+          <Link href={href} className="transition-colors group-hover:text-accent">
             {blog.title}
           </Link>
         </h3>

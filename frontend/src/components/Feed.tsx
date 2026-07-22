@@ -10,7 +10,7 @@ import { Avatar } from "./Avatar";
 import { TagChip } from "./TagChip";
 import { Pagination } from "./Pagination";
 import { Spinner, EmptyState, ErrorState } from "./states";
-import { formatDate, readingTime, excerpt } from "@/lib/format";
+import { formatDate, readingTime, excerpt, blogHref } from "@/lib/format";
 
 const PAGE_SIZE = 9;
 
@@ -24,7 +24,7 @@ interface FeedResponse {
 function FeaturedHero({ blog }: { blog: Blog }) {
   return (
     <Link
-      href={`/blog/${blog._id}`}
+      href={blogHref(blog)}
       className="group mb-12 grid gap-6 overflow-hidden rounded-2xl border border-border bg-card md:grid-cols-2"
     >
       <div className="relative aspect-[16/11] overflow-hidden bg-subtle md:aspect-auto">

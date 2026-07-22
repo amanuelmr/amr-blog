@@ -1,3 +1,8 @@
+// Public article URL: prefer the human-readable slug, fall back to the id.
+export function blogHref(blog: { _id: string; slug?: string }): string {
+  return `/blog/${blog.slug || blog._id}`;
+}
+
 export function formatDate(iso?: string): string {
   if (!iso) return "";
   const d = new Date(iso);

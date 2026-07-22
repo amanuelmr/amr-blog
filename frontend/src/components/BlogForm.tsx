@@ -9,7 +9,7 @@ import { FormAlert } from "@/components/AuthCard";
 import { RichTextEditor } from "@/components/editor/RichTextEditor";
 import { CoverImageInput } from "@/components/editor/CoverImageInput";
 import { TagInput } from "@/components/ui/TagInput";
-import { stripHtml, contentToHtml } from "@/lib/format";
+import { stripHtml, contentToHtml, blogHref } from "@/lib/format";
 
 export function BlogForm({ mode, blog }: { mode: "create" | "edit"; blog?: Blog }) {
   const router = useRouter();
@@ -61,7 +61,7 @@ export function BlogForm({ mode, blog }: { mode: "create" | "edit"; blog?: Blog 
         mode === "create" ? "/blogs/create" : `/blogs/${blog!._id}`,
         { method: mode === "create" ? "POST" : "PUT", form }
       );
-      router.push(`/blog/${res.blog._id}`);
+      router.push(blogHref(res.blog));
       router.refresh();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not save the article.");
