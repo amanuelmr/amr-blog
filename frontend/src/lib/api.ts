@@ -5,6 +5,17 @@
 const BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1";
 
+// Backend origin without the "/api/v1" path — e.g. the Swagger UI is served at
+// `${API_ORIGIN}/swagger-ui`. Derived from NEXT_PUBLIC_API_URL so it always
+// tracks the configured backend.
+export const API_ORIGIN = (() => {
+  try {
+    return new URL(BASE_URL).origin;
+  } catch {
+    return "http://localhost:5000";
+  }
+})();
+
 export class ApiError extends Error {
   status: number;
   data: unknown;

@@ -1,16 +1,12 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import Link from "next/link";
 import { Blog } from "@/lib/types";
 import { api, ApiError } from "@/lib/api";
-import { BlogCard } from "./BlogCard";
-import { CoverImage } from "./CoverImage";
-import { Avatar } from "./Avatar";
-import { TagChip } from "./TagChip";
+import { FeaturedLead } from "./FeaturedLead";
+import { ArticleRow } from "./ArticleRow";
 import { Pagination } from "./Pagination";
 import { Spinner, EmptyState, ErrorState } from "./states";
-import { formatDate, readingTime, excerpt, blogHref } from "@/lib/format";
 
 const PAGE_SIZE = 9;
 
@@ -21,36 +17,12 @@ interface FeedResponse {
   totalPages: number;
 }
 
-function FeaturedHero({ blog }: { blog: Blog }) {
+function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <Link
-      href={blogHref(blog)}
-      className="group mb-12 grid gap-6 overflow-hidden rounded-2xl border border-border bg-card md:grid-cols-2"
-    >
-      <div className="relative aspect-[16/11] overflow-hidden bg-subtle md:aspect-auto">
-        <div className="h-full w-full transition-transform duration-500 group-hover:scale-105">
-          <CoverImage src={blog.titleBackgroundImageUrl} title={blog.title} priority sizes="(max-width: 768px) 100vw, 600px" />
-        </div>
-      </div>
-      <div className="flex flex-col justify-center gap-4 p-6 md:p-10">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold uppercase tracking-wider text-accent">Featured</span>
-          {blog.tags?.[0] && <TagChip tag={blog.tags[0]} />}
-        </div>
-        <h2 className="text-balance text-3xl font-bold leading-tight transition-colors group-hover:text-accent md:text-4xl">
-          {blog.title}
-        </h2>
-        <p className="text-muted">{excerpt(blog.content, 220)}</p>
-        <div className="mt-2 flex items-center gap-2.5 text-sm text-muted">
-          <Avatar name={blog.author?.name} size={32} />
-          <span className="text-fg">{blog.author?.name ?? "Unknown"}</span>
-          <span className="text-border">·</span>
-          <span>{formatDate(blog.createdAt)}</span>
-          <span className="text-border">·</span>
-          <span>{readingTime(blog.content)} min read</span>
-        </div>
-      </div>
-    </Link>
+    <div className="mb-2 flex items-center gap-3">
+      <span className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">{children}</span>
+      <span className="h-px flex-1 bg-border" />
+    </div>
   );
 }
 
@@ -85,27 +57,36 @@ export function Feed({ q, page }: { q: string; page: number }) {
 
   const showHero = !q && page === 1;
   const blogs = data?.blogs ?? [];
-  const gridBlogs = showHero ? blogs.slice(1) : blogs;
+  const listBlogs = showHero ? blogs.slice(1) : blogs;
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+    <div className="mx-auto max-w-4xl px-5 py-12 sm:px-6 sm:py-16">
+      {/* Masthead */}
       {q ? (
-        <div className="mb-8">
-          <p className="text-sm text-muted">Search results</p>
-          <h1 className="text-2xl font-bold">
-            “{q}”{data ? ` · ${data.total} found` : ""}
+        <header className="mb-10">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">Search</p>
+          <h1 className="mt-3 font-serif text-3xl font-bold tracking-tight sm:text-4xl">
+            “{q}”
           </h1>
-        </div>
+          {data && (
+            <p className="mt-2 text-muted">
+              {data.total} {data.total === 1 ? "result" : "results"}
+            </p>
+          )}
+        </header>
       ) : (
         page === 1 && (
-          <div className="mb-10 max-w-2xl">
-            <h1 className="text-balance text-4xl font-bold tracking-tight">
+          <header className="mb-12">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">
+              AMR · Journal
+            </p>
+            <h1 className="mt-4 text-balance font-serif text-4xl font-bold leading-tight tracking-tight sm:text-5xl">
               Writing on building software.
             </h1>
-            <p className="mt-3 text-lg text-muted">
-              Notes on backend, systems, and the craft of shipping things that last.
+            <p className="mt-4 max-w-2xl text-lg leading-relaxed text-muted">
+              Essays and field notes on backend, systems, and the craft of shipping things that last.
             </p>
-          </div>
+          </header>
         )
       )}
 
@@ -120,14 +101,23 @@ export function Feed({ q, page }: { q: string; page: number }) {
         />
       ) : (
         <>
-          {showHero && <FeaturedHero blog={blogs[0]} />}
-          {gridBlogs.length > 0 && (
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {gridBlogs.map((b) => (
-                <BlogCard key={b._id} blog={b} />
-              ))}
+          {showHero && (
+            <div className="mb-16">
+              <FeaturedLead blog={blogs[0]} />
             </div>
           )}
+
+          {listBlogs.length > 0 && (
+            <section>
+              <SectionLabel>{showHero ? "The Latest" : q ? "Results" : "More stories"}</SectionLabel>
+              <div>
+                {listBlogs.map((b, i) => (
+                  <ArticleRow key={b._id} blog={b} index={i} />
+                ))}
+              </div>
+            </section>
+          )}
+
           {data && <Pagination page={data.page} totalPages={data.totalPages} makeHref={makeHref} />}
         </>
       )}
