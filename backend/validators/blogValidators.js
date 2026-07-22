@@ -3,9 +3,13 @@ const { z } = require("zod");
 // Tags may arrive as an array (JSON) or a comma-separated string (form-data).
 const tags = z.union([z.array(z.string()), z.string()]).optional();
 
+// Content is rich HTML from the editor; cap size before it reaches the
+// sanitizer/DB. min(1) rejects empty submissions (raw string).
+const contentMax = 100000;
+
 const createBlogSchema = z.object({
   title: z.string().trim().min(1, "Title is required").max(300),
-  content: z.string().trim().min(1, "Content is required"),
+  content: z.string().trim().min(1, "Content is required").max(contentMax, "Content is too long"),
   tags,
 });
 
@@ -13,7 +17,7 @@ const createBlogSchema = z.object({
 // (multipart file) without changing any text field.
 const editBlogSchema = z.object({
   title: z.string().trim().min(1).max(300).optional(),
-  content: z.string().trim().min(1).optional(),
+  content: z.string().trim().min(1).max(contentMax, "Content is too long").optional(),
   tags,
 });
 

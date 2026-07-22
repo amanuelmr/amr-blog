@@ -2,6 +2,7 @@ const Blog = require("../models/Blog");
 const User = require("../models/User");
 const escapeRegex = require("../utils/escapeRegex");
 const getPagination = require("../utils/pagination");
+const sanitizeContent = require("../utils/sanitizeContent");
 
 // Create a blog
 exports.createBlog = async (req, res) => {
@@ -29,7 +30,7 @@ exports.createBlog = async (req, res) => {
     const blog = new Blog({
       title,
       titleBackgroundImageUrl: req.file ? req.file.path : null, // Only use uploaded image
-      content,
+      content: sanitizeContent(content), // rich HTML — sanitized before persisting
       tags: tags ? (Array.isArray(tags) ? tags : tags.split(',').map(tag => tag.trim())) : [],
       author: req.user.id,
     });
@@ -135,7 +136,7 @@ exports.editBlog = async (req, res) => {
     
     // Update fields if provided
     if (title) blog.title = title;
-    if (content) blog.content = content;
+    if (content) blog.content = sanitizeContent(content);
     if (tags) {
       blog.tags = Array.isArray(tags) ? tags : tags.split(',').map(tag => tag.trim());
     }
@@ -441,4 +442,13 @@ exports.editComment = async (req, res) => {
     console.error(error.message);
     res.status(500).send("Server error");
   }
+};
+
+// Upload an inline image for the editor. Multer + Cloudinary storage have
+// already uploaded the file by the time this runs; return its hosted URL.
+exports.uploadImage = async (req, res) => {
+  if (!req.file || !req.file.path) {
+    return res.status(400).json({ success: false, msg: "No image uploaded" });
+  }
+  return res.status(201).json({ success: true, url: req.file.path });
 };

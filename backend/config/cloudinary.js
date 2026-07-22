@@ -31,19 +31,43 @@ const storage = new CloudinaryStorage({
   },
 });
 
-// Create multer upload middleware
-const upload = multer({ 
+// Cover images: cropped to a fixed 1200x600 banner.
+const upload = multer({
   storage: storage,
   limits: {
     fileSize: 5 * 1024 * 1024, // 5MB limit
   },
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) {
-      cb(null, true);
-    } else {
-      cb(new Error('Only image files are allowed!'), false);
-    }
-  }
+  fileFilter: imageOnly,
 });
 
-module.exports = { cloudinary, upload }; 
+// Inline content images: keep the original aspect ratio, just cap the width
+// (crop: 'limit' never upscales and never crops).
+const contentStorage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: async (_req, _file) => {
+    return {
+      folder: 'blog-content-images',
+      allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
+      public_id: `content-${Date.now()}-${Math.round(Math.random() * 1e9)}`,
+      transformation: [{ width: 1600, crop: 'limit', quality: 'auto:good' }],
+    };
+  },
+});
+
+const uploadContent = multer({
+  storage: contentStorage,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  },
+  fileFilter: imageOnly,
+});
+
+function imageOnly(req, file, cb) {
+  if (file.mimetype.startsWith('image/')) {
+    cb(null, true);
+  } else {
+    cb(new Error('Only image files are allowed!'), false);
+  }
+}
+
+module.exports = { cloudinary, upload, uploadContent };
