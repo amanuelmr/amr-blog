@@ -10,6 +10,7 @@ import { RichTextEditor } from "@/components/editor/RichTextEditor";
 import { CoverImageInput } from "@/components/editor/CoverImageInput";
 import { TagInput } from "@/components/ui/TagInput";
 import { stripHtml, contentToHtml, blogHref } from "@/lib/format";
+import { uploadToCloudinary } from "@/lib/uploadToCloudinary";
 
 export function BlogForm({ mode, blog }: { mode: "create" | "edit"; blog?: Blog }) {
   const router = useRouter();
@@ -50,16 +51,24 @@ export function BlogForm({ mode, blog }: { mode: "create" | "edit"; blog?: Blog 
     }
     setSaving(true);
     setError("");
-    const form = new FormData();
-    form.append("title", title.trim());
-    form.append("content", content);
-    form.append("tags", tags.join(","));
-    if (file) form.append("titleBackgroundImage", file);
 
     try {
+      // A new cover is uploaded straight to Cloudinary; otherwise keep the
+      // existing URL (edit) or null (no cover / removed).
+      let coverUrl: string | null = file ? null : preview;
+      if (file) coverUrl = await uploadToCloudinary(file, "cover");
+
       const res = await api<{ blog: Blog }>(
         mode === "create" ? "/blogs/create" : `/blogs/${blog!._id}`,
-        { method: mode === "create" ? "POST" : "PUT", form }
+        {
+          method: mode === "create" ? "POST" : "PUT",
+          body: {
+            title: title.trim(),
+            content,
+            tags,
+            titleBackgroundImageUrl: coverUrl,
+          },
+        }
       );
       router.push(blogHref(res.blog));
       router.refresh();

@@ -7,18 +7,30 @@ const tags = z.union([z.array(z.string()), z.string()]).optional();
 // sanitizer/DB. min(1) rejects empty submissions (raw string).
 const contentMax = 100000;
 
+// Cover image URL — must be a Cloudinary https URL (the client uploads directly
+// to Cloudinary and sends back the resulting secure_url). Nullable to allow
+// clearing the cover on edit.
+const coverUrl = z
+  .string()
+  .url()
+  .refine((u) => /^https:\/\/res\.cloudinary\.com\//.test(u), "Invalid image URL")
+  .nullable()
+  .optional();
+
 const createBlogSchema = z.object({
   title: z.string().trim().min(1, "Title is required").max(300),
   content: z.string().trim().min(1, "Content is required").max(contentMax, "Content is too long"),
   tags,
+  titleBackgroundImageUrl: coverUrl,
 });
 
-// All fields optional: an edit may update only the title background image
-// (multipart file) without changing any text field.
+// All fields optional: an edit may update only the cover image without
+// changing any text field.
 const editBlogSchema = z.object({
   title: z.string().trim().min(1).max(300).optional(),
   content: z.string().trim().min(1).max(contentMax, "Content is too long").optional(),
   tags,
+  titleBackgroundImageUrl: coverUrl,
 });
 
 const commentSchema = z.object({

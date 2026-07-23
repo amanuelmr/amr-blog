@@ -6,13 +6,15 @@ const BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1";
 
 // Backend origin without the "/api/v1" path — e.g. the Swagger UI is served at
-// `${API_ORIGIN}/swagger-ui`. Derived from NEXT_PUBLIC_API_URL so it always
-// tracks the configured backend.
+// `${API_ORIGIN}/swagger-ui`. When NEXT_PUBLIC_API_URL is relative (e.g.
+// "/api/v1" behind the same-origin proxy), API_ORIGIN is "" so links stay
+// same-origin; when absolute, it's the backend origin.
 export const API_ORIGIN = (() => {
+  if (BASE_URL.startsWith("/")) return "";
   try {
     return new URL(BASE_URL).origin;
   } catch {
-    return "http://localhost:5000";
+    return "";
   }
 })();
 
