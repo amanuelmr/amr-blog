@@ -5,6 +5,7 @@ const escapeRegex = require("../utils/escapeRegex");
 const getPagination = require("../utils/pagination");
 const sanitizeContent = require("../utils/sanitizeContent");
 const { makeSlug } = require("../utils/slugify");
+const { cloudinary } = require("../config/cloudinary");
 
 // Create a blog
 exports.createBlog = async (req, res) => {
@@ -31,7 +32,8 @@ exports.createBlog = async (req, res) => {
 
     const blog = new Blog({
       title,
-      titleBackgroundImageUrl: req.file ? req.file.path : null, // Only use uploaded image
+      // Cover is uploaded directly to Cloudinary by the client; we store the URL.
+      titleBackgroundImageUrl: req.body.titleBackgroundImageUrl || null,
       content: sanitizeContent(content), // rich HTML — sanitized before persisting
       tags: tags ? (Array.isArray(tags) ? tags : tags.split(',').map(tag => tag.trim())) : [],
       author: req.user.id,
@@ -154,9 +156,9 @@ exports.editBlog = async (req, res) => {
       blog.tags = Array.isArray(tags) ? tags : tags.split(',').map(tag => tag.trim());
     }
     
-    // Only update image if new file is uploaded, otherwise keep existing
-    if (req.file) {
-      blog.titleBackgroundImageUrl = req.file.path;
+    // Cover URL: update when provided (a string sets it, null/"" clears it).
+    if (req.body.titleBackgroundImageUrl !== undefined) {
+      blog.titleBackgroundImageUrl = req.body.titleBackgroundImageUrl || null;
     }
 
     // Keep the slug stable across edits (link permanence); backfill if missing.
@@ -462,11 +464,21 @@ exports.editComment = async (req, res) => {
   }
 };
 
-// Upload an inline image for the editor. Multer + Cloudinary storage have
-// already uploaded the file by the time this runs; return its hosted URL.
-exports.uploadImage = async (req, res) => {
-  if (!req.file || !req.file.path) {
-    return res.status(400).json({ success: false, msg: "No image uploaded" });
-  }
-  return res.status(201).json({ success: true, url: req.file.path });
+// Issue a short-lived signature so the client can upload an image directly to
+// Cloudinary (browser → Cloudinary), keeping large files off the serverless
+// function. `type=content` targets a different folder than the cover.
+exports.uploadSignature = async (req, res) => {
+  const folder = req.query.type === "content" ? "blog-content-images" : "blog-title-images";
+  const timestamp = Math.round(Date.now() / 1000);
+  const signature = cloudinary.utils.api_sign_request(
+    { timestamp, folder },
+    process.env.CLOUDINARY_API_SECRET
+  );
+  return res.json({
+    cloudName: process.env.CLOUDINARY_CLOUD_NAME,
+    apiKey: process.env.CLOUDINARY_API_KEY,
+    timestamp,
+    folder,
+    signature,
+  });
 };

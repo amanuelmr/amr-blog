@@ -1,73 +1,14 @@
 const cloudinary = require('cloudinary').v2;
-const { CloudinaryStorage } = require('multer-storage-cloudinary');
-const multer = require('multer');
 require('dotenv').config();
 
-// Configure Cloudinary
+// Images are uploaded directly from the browser to Cloudinary (signed), so the
+// server only needs the SDK configured for signing and admin calls — no multer
+// / streaming through the serverless function (avoids Vercel's body limit).
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
-  secure: true
+  secure: true,
 });
 
-// Configure Cloudinary storage for multer
-const storage = new CloudinaryStorage({
-  cloudinary: cloudinary,
-  params: async (_req, _file) => {
-    return {
-      folder: 'blog-title-images',
-      allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
-      public_id: `blog-${Date.now()}-${Math.round(Math.random() * 1E9)}`,
-      transformation: [
-        {
-          width: 1200,
-          height: 600,
-          crop: 'fill',
-          quality: 'auto:good'
-        }
-      ]
-    };
-  },
-});
-
-// Cover images: cropped to a fixed 1200x600 banner.
-const upload = multer({
-  storage: storage,
-  limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB limit
-  },
-  fileFilter: imageOnly,
-});
-
-// Inline content images: keep the original aspect ratio, just cap the width
-// (crop: 'limit' never upscales and never crops).
-const contentStorage = new CloudinaryStorage({
-  cloudinary: cloudinary,
-  params: async (_req, _file) => {
-    return {
-      folder: 'blog-content-images',
-      allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
-      public_id: `content-${Date.now()}-${Math.round(Math.random() * 1e9)}`,
-      transformation: [{ width: 1600, crop: 'limit', quality: 'auto:good' }],
-    };
-  },
-});
-
-const uploadContent = multer({
-  storage: contentStorage,
-  limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB limit
-  },
-  fileFilter: imageOnly,
-});
-
-function imageOnly(req, file, cb) {
-  if (file.mimetype.startsWith('image/')) {
-    cb(null, true);
-  } else {
-    cb(new Error('Only image files are allowed!'), false);
-  }
-}
-
-module.exports = { cloudinary, upload, uploadContent };
+module.exports = { cloudinary };
