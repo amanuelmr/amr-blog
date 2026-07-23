@@ -13,6 +13,10 @@ const { generalLimiter } = require('./middlewares/rateLimiters');
 
 const app = express();
 
+// Behind Vercel/other proxies: trust the first proxy so client IPs (rate
+// limiting) and secure-cookie detection work correctly.
+app.set('trust proxy', 1);
+
 // Security headers
 app.use(helmet());
 
@@ -39,9 +43,21 @@ app.use(generalLimiter);
 // Initialize Swagger docs
 swaggerDocs(app);
 
+// Ensure the database is connected before handling API requests. On serverless
+// (e.g. Vercel) the app is imported without running startServer(), so we
+// connect lazily here; connectDB() caches and reuses the connection.
+const ensureDb = async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    next(err);
+  }
+};
+
 // Routes
-app.use('/api/v1/auth', require('./routes/authRoutes'));
-app.use('/api/v1/blogs', require('./routes/blogRoutes'));
+app.use('/api/v1/auth', ensureDb, require('./routes/authRoutes'));
+app.use('/api/v1/blogs', ensureDb, require('./routes/blogRoutes'));
 
 // Test Route
 app.get('/test', (req, res) => {
