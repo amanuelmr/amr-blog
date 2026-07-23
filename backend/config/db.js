@@ -17,7 +17,10 @@ const connectDB = async () => {
   }
 
   connectionPromise = mongoose
-    .connect(mongoURI)
+    .connect(mongoURI, {
+      serverSelectionTimeoutMS: 8000, // fail fast on cold start instead of hanging
+      maxPoolSize: 5, // keep the connection pool small on serverless
+    })
     .then((m) => {
       console.log("MongoDB connected");
       return m.connection;

@@ -184,7 +184,9 @@ exports.login = async (req, res) => {
     const options = {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
+      // Cross-site (SPA and API on different domains) requires SameSite=None
+      // + Secure so the browser sends the auth cookies on cross-origin requests.
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
     };
 
@@ -348,7 +350,9 @@ exports.logout = async (req, res) => {
     const options = {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
+      // Cross-site (SPA and API on different domains) requires SameSite=None
+      // + Secure so the browser sends the auth cookies on cross-origin requests.
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
     };
     return res
       .status(200)
@@ -386,7 +390,9 @@ exports.refreshToken = async (req, res) => {
     const options = {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
+      // Cross-site (SPA and API on different domains) requires SameSite=None
+      // + Secure so the browser sends the auth cookies on cross-origin requests.
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     };
 
