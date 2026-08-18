@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Blog } from "@/lib/types";
@@ -15,6 +15,7 @@ import { TableOfContents } from "./TableOfContents";
 import { Spinner, ErrorState } from "./states";
 import { formatDate, readingTime, contentToHtml } from "@/lib/format";
 import { withHeadingAnchors } from "@/lib/toc";
+import { enhanceCodeBlocks } from "@/lib/codeHighlight";
 import DOMPurify from "isomorphic-dompurify";
 
 export function Article({ id }: { id: string }) {
@@ -24,6 +25,19 @@ export function Article({ id }: { id: string }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [deleting, setDeleting] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  // Content is sanitized server-side on save; sanitize again here (DOMPurify)
+  // as defense-in-depth before injecting it into the DOM.
+  const { html, headings } = useMemo(() => {
+    if (!blog) return { html: "", headings: [] };
+    const sanitized = DOMPurify.sanitize(contentToHtml(blog.content));
+    return withHeadingAnchors(sanitized);
+  }, [blog]);
+
+  useEffect(() => {
+    if (contentRef.current) enhanceCodeBlocks(contentRef.current);
+  }, [html]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -66,10 +80,6 @@ export function Article({ id }: { id: string }) {
     );
 
   const isOwner = !!user && !!blog.author && blog.author._id === user._id;
-  // Content is sanitized server-side on save; sanitize again here (DOMPurify)
-  // as defense-in-depth before injecting it into the DOM.
-  const sanitized = DOMPurify.sanitize(contentToHtml(blog.content));
-  const { html, headings } = withHeadingAnchors(sanitized);
 
   return (
     <article className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
@@ -127,6 +137,7 @@ export function Article({ id }: { id: string }) {
       <TableOfContents headings={headings} />
 
       <div
+        ref={contentRef}
         className="prose prose-stone dark:prose-invert prose-lg mt-10 max-w-none prose-a:text-accent prose-img:rounded-xl"
         dangerouslySetInnerHTML={{ __html: html }}
       />
