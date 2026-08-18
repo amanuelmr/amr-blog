@@ -18,6 +18,18 @@ export const API_ORIGIN = (() => {
   }
 })();
 
+/**
+ * Absolute API base for server-side code (route handlers, sitemap
+ * generation) that has no browser to resolve a relative NEXT_PUBLIC_API_URL
+ * against. Falls back to BACKEND_URL — the same var the same-origin proxy
+ * rewrites to (see next.config.mjs) — plus the API_URL's own path.
+ */
+export function serverApiBase(): string {
+  if (!BASE_URL.startsWith("/")) return BASE_URL;
+  const backend = process.env.BACKEND_URL || "http://localhost:5000";
+  return `${backend}${BASE_URL}`;
+}
+
 export class ApiError extends Error {
   status: number;
   data: unknown;

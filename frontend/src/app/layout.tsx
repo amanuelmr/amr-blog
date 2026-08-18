@@ -20,6 +20,9 @@ export const metadata: Metadata = {
   title: "AMR Blog — writing on building software",
   description:
     "Articles on backend, systems, and the craft of building software. Read, discuss, and publish.",
+  alternates: {
+    types: { "application/rss+xml": "/rss.xml" },
+  },
 };
 
 // Set the theme class before paint to avoid a flash of the wrong theme.

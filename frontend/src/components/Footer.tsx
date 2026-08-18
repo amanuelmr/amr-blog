@@ -9,6 +9,7 @@ export function Footer() {
         <nav className="flex items-center gap-5">
           <Link href="/" className="hover:text-fg">Home</Link>
           <Link href="/write" className="hover:text-fg">Write</Link>
+          <a href="/rss.xml" className="hover:text-fg" target="_blank" rel="noreferrer">RSS</a>
           <a href={`${API_ORIGIN}/swagger-ui`} className="hover:text-fg" target="_blank" rel="noreferrer">API</a>
         </nav>
       </div>
