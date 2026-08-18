@@ -32,6 +32,7 @@ export interface Blog {
   tags: string[];
   likes: string[];
   shares: number;
+  views: number;
   comments: Comment[];
   createdAt: string;
 }

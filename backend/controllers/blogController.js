@@ -97,12 +97,22 @@ exports.getAllBlogs = async (req, res) => {
 };
 
 // Get a blog by slug (preferred) or by Mongo id (backward compatible).
+// $inc + findOneAndUpdate bumps the view counter atomically as part of the
+// same lookup, rather than a separate read-then-write.
 exports.getBlogById = async (req, res) => {
   try {
     const { id } = req.params;
-    let blog = await Blog.findOne({ slug: id }).populate("author", "name");
+    let blog = await Blog.findOneAndUpdate(
+      { slug: id },
+      { $inc: { views: 1 } },
+      { new: true }
+    ).populate("author", "name");
     if (!blog && mongoose.isValidObjectId(id)) {
-      blog = await Blog.findById(id).populate("author", "name");
+      blog = await Blog.findOneAndUpdate(
+        { _id: id },
+        { $inc: { views: 1 } },
+        { new: true }
+      ).populate("author", "name");
     }
 
     if (!blog) {

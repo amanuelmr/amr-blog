@@ -108,6 +108,8 @@ export function Article({ id }: { id: string }) {
         <span>{formatDate(blog.createdAt)}</span>
         <span className="text-border">·</span>
         <span>{readingTime(blog.content)} min read</span>
+        <span className="text-border">·</span>
+        <span>{(blog.views ?? 0).toLocaleString()} view{(blog.views ?? 0) === 1 ? "" : "s"}</span>
 
         {isOwner && (
           <span className="ml-auto flex gap-2">

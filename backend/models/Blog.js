@@ -20,6 +20,7 @@ const blogSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now },
   likes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], // Array to store users who liked the post
   shares: { type: Number, default: 0 }, // Counter for shares
+  views: { type: Number, default: 0 }, // Counter for reads, bumped on each fetch by id/slug
   comments: [commentSchema] // Array of comment sub-documents
 });
 
