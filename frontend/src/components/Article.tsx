@@ -11,8 +11,10 @@ import { Avatar } from "./Avatar";
 import { TagChip } from "./TagChip";
 import { LikeButton } from "./LikeButton";
 import { CommentSection } from "./CommentSection";
+import { TableOfContents } from "./TableOfContents";
 import { Spinner, ErrorState } from "./states";
 import { formatDate, readingTime, contentToHtml } from "@/lib/format";
+import { withHeadingAnchors } from "@/lib/toc";
 import DOMPurify from "isomorphic-dompurify";
 
 export function Article({ id }: { id: string }) {
@@ -66,7 +68,8 @@ export function Article({ id }: { id: string }) {
   const isOwner = !!user && !!blog.author && blog.author._id === user._id;
   // Content is sanitized server-side on save; sanitize again here (DOMPurify)
   // as defense-in-depth before injecting it into the DOM.
-  const html = DOMPurify.sanitize(contentToHtml(blog.content));
+  const sanitized = DOMPurify.sanitize(contentToHtml(blog.content));
+  const { html, headings } = withHeadingAnchors(sanitized);
 
   return (
     <article className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
@@ -120,6 +123,8 @@ export function Article({ id }: { id: string }) {
           <CoverImage src={blog.titleBackgroundImageUrl} title={blog.title} priority sizes="(max-width: 768px) 100vw, 768px" />
         </div>
       )}
+
+      <TableOfContents headings={headings} />
 
       <div
         className="prose prose-stone dark:prose-invert prose-lg mt-10 max-w-none prose-a:text-accent prose-img:rounded-xl"
