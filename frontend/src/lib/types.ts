@@ -22,6 +22,8 @@ export interface Comment {
   editedAt?: string;
 }
 
+export type BlogStatus = "draft" | "published";
+
 export interface Blog {
   _id: string;
   slug?: string;
@@ -30,6 +32,9 @@ export interface Blog {
   titleBackgroundImageUrl?: string | null;
   author: Author | null;
   tags: string[];
+  status: BlogStatus;
+  // A "published" post with a future publishedAt is scheduled, not live yet.
+  publishedAt?: string | null;
   likes: string[];
   shares: number;
   views: number;

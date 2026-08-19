@@ -18,6 +18,11 @@ const blogSchema = new mongoose.Schema({
   author: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   tags: [String],
   createdAt: { type: Date, default: Date.now },
+  // "published" with a future publishedAt is how a scheduled post stays
+  // hidden until then (see utils/blogVisibility.js) — no separate
+  // "scheduled" status needed.
+  status: { type: String, enum: ["draft", "published"], default: "published" },
+  publishedAt: { type: Date },
   likes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], // Array to store users who liked the post
   shares: { type: Number, default: 0 }, // Counter for shares
   views: { type: Number, default: 0 }, // Counter for reads, bumped on each fetch by id/slug

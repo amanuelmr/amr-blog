@@ -142,6 +142,87 @@ describe('Blog API', () => {
     });
   });
 
+  describe('draft & scheduled visibility', () => {
+    it('hides a draft from the public feed and search, but the owner can still fetch it', async () => {
+      const agent = request.agent(app);
+      await registerVerifyLogin(agent);
+      const created = await createBlog(agent, { title: 'Unfinished Draft', status: 'draft' }).expect(201);
+      expect(created.body.blog.status).toBe('draft');
+      expect(created.body.blog.publishedAt).toBeNull();
+      const id = created.body.blog._id;
+
+      const feed = await request(app).get('/api/v1/blogs').expect(200);
+      expect(feed.body.blogs.find((b) => b._id === id)).toBeUndefined();
+
+      const search = await request(app)
+        .get('/api/v1/blogs/search?query=Unfinished')
+        .expect(200);
+      expect(search.body.total).toBe(0);
+
+      // Anonymous direct fetch: 404, not a leak of "it exists but is private".
+      await request(app).get(`/api/v1/blogs/${id}`).expect(404);
+
+      // The owner (cookie-authenticated) can still load it.
+      const own = await agent.get(`/api/v1/blogs/${id}`).expect(200);
+      expect(own.body._id).toBe(id);
+    });
+
+    it('hides a scheduled post until its publish date arrives', async () => {
+      const agent = request.agent(app);
+      await registerVerifyLogin(agent);
+      const future = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+      const created = await createBlog(agent, { title: 'Future Post', publishedAt: future }).expect(201);
+      const id = created.body.blog._id;
+      expect(created.body.blog.status).toBe('published');
+
+      await request(app).get(`/api/v1/blogs/${id}`).expect(404);
+
+      const past = new Date(Date.now() - 1000).toISOString();
+      await agent.put(`/api/v1/blogs/${id}`).send({ publishedAt: past }).expect(200);
+      await request(app).get(`/api/v1/blogs/${id}`).expect(200);
+    });
+
+    it("editing a live post's content doesn't reset its publish date", async () => {
+      const agent = request.agent(app);
+      await registerVerifyLogin(agent);
+      const created = await createBlog(agent).expect(201);
+      const id = created.body.blog._id;
+      const originalPublishedAt = created.body.blog.publishedAt;
+
+      await new Promise((r) => setTimeout(r, 5));
+      const edited = await agent.put(`/api/v1/blogs/${id}`).send({ title: 'Updated title' }).expect(200);
+      expect(edited.body.blog.publishedAt).toBe(originalPublishedAt);
+    });
+
+    it("blocks a non-owner from liking or commenting on someone else's draft", async () => {
+      const owner = request.agent(app);
+      await registerVerifyLogin(owner);
+      const created = await createBlog(owner, { status: 'draft' }).expect(201);
+      const id = created.body.blog._id;
+
+      const other = request.agent(app);
+      await registerVerifyLogin(other, { email: 'nosy@example.com', name: 'Nosy User' });
+
+      await other.post(`/api/v1/blogs/${id}/like`).expect(404);
+      await other.post(`/api/v1/blogs/${id}/comments`).send({ text: 'hi' }).expect(404);
+    });
+  });
+
+  describe('mine', () => {
+    it("lists the author's own posts of every status, but requires auth", async () => {
+      const agent = request.agent(app);
+      await registerVerifyLogin(agent);
+      await createBlog(agent, { title: 'Draft one', status: 'draft' }).expect(201);
+      await createBlog(agent, { title: 'Live one' }).expect(201);
+
+      await request(app).get('/api/v1/blogs/mine').expect(401);
+
+      const mine = await agent.get('/api/v1/blogs/mine').expect(200);
+      expect(mine.body.total).toBe(2);
+      expect(mine.body.blogs.map((b) => b.status).sort()).toEqual(['draft', 'published']);
+    });
+  });
+
   describe('search', () => {
     it('handles regex metacharacters safely (no ReDoS / injection)', async () => {
       const agent = request.agent(app);

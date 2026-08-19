@@ -51,6 +51,9 @@ export function Header() {
           <ThemeToggle />
           {loading ? null : user ? (
             <>
+              <LinkButton href="/write/mine" variant="ghost" size="sm" className="hidden sm:inline-flex">
+                Your posts
+              </LinkButton>
               <LinkButton href="/write" size="sm" className="hidden sm:inline-flex">
                 Write
               </LinkButton>

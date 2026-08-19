@@ -17,11 +17,19 @@ const coverUrl = z
   .nullable()
   .optional();
 
+// "published" with a future publishedAt is how a post gets scheduled — see
+// utils/blogVisibility.js. `.nullable()` on publishedAt lets a client clear
+// a schedule explicitly.
+const status = z.enum(["draft", "published"]).optional();
+const publishedAt = z.coerce.date().nullable().optional();
+
 const createBlogSchema = z.object({
   title: z.string().trim().min(1, "Title is required").max(300),
   content: z.string().trim().min(1, "Content is required").max(contentMax, "Content is too long"),
   tags,
   titleBackgroundImageUrl: coverUrl,
+  status,
+  publishedAt,
 });
 
 // All fields optional: an edit may update only the cover image without
@@ -31,6 +39,8 @@ const editBlogSchema = z.object({
   content: z.string().trim().min(1).max(contentMax, "Content is too long").optional(),
   tags,
   titleBackgroundImageUrl: coverUrl,
+  status,
+  publishedAt,
 });
 
 const commentSchema = z.object({

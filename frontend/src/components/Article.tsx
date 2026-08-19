@@ -13,7 +13,7 @@ import { LikeButton } from "./LikeButton";
 import { CommentSection } from "./CommentSection";
 import { TableOfContents } from "./TableOfContents";
 import { Spinner, ErrorState } from "./states";
-import { formatDate, readingTime, contentToHtml } from "@/lib/format";
+import { formatDate, readingTime, contentToHtml, publishState } from "@/lib/format";
 import { withHeadingAnchors } from "@/lib/toc";
 import { enhanceCodeBlocks } from "@/lib/codeHighlight";
 import DOMPurify from "isomorphic-dompurify";
@@ -80,12 +80,21 @@ export function Article({ id }: { id: string }) {
     );
 
   const isOwner = !!user && !!blog.author && blog.author._id === user._id;
+  const state = publishState(blog);
 
   return (
     <article className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
       <Link href="/" className="mb-8 inline-flex items-center gap-1 text-sm text-muted hover:text-fg">
         ← All articles
       </Link>
+
+      {isOwner && state !== "live" && (
+        <div className="mb-6 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-sm text-amber-700 dark:text-amber-400">
+          {state === "draft"
+            ? "This is a draft — only you can see it."
+            : `Scheduled to publish on ${formatDate(blog.publishedAt ?? undefined)} — only you can see it until then.`}
+        </div>
+      )}
 
       {blog.tags?.length > 0 && (
         <div className="mb-4 flex flex-wrap gap-1.5">

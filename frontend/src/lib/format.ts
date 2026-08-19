@@ -3,6 +3,16 @@ export function blogHref(blog: { _id: string; slug?: string }): string {
   return `/blog/${blog.slug || blog._id}`;
 }
 
+export type PublishState = "draft" | "scheduled" | "live";
+
+// A "published" post with a future publishedAt is scheduled, not live yet —
+// mirrors the backend's isPublished() in blogVisibility.js.
+export function publishState(blog: { status: string; publishedAt?: string | null }): PublishState {
+  if (blog.status !== "published") return "draft";
+  if (blog.publishedAt && new Date(blog.publishedAt) > new Date()) return "scheduled";
+  return "live";
+}
+
 export function formatDate(iso?: string): string {
   if (!iso) return "";
   const d = new Date(iso);

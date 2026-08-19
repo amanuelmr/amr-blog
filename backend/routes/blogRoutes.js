@@ -26,6 +26,14 @@
  *         titleBackgroundImageUrl:
  *           type: string
  *           description: URL of the uploaded background image for the title
+ *         status:
+ *           type: string
+ *           enum: [draft, published]
+ *           description: "Defaults to published. A published post with a future publishedAt is scheduled — hidden until that date."
+ *         publishedAt:
+ *           type: string
+ *           format: date-time
+ *           description: When the post went (or will go) live. Omit to publish immediately; set a future date to schedule.
  */
 
 const express = require('express');
@@ -33,6 +41,7 @@ const router = express.Router();
 const { wrapAll } = require('../utils/asyncHandler');
 const BlogController = wrapAll(require('../controllers/blogController'));
 const authMiddleware = require('../middlewares/authMiddleware');
+const optionalAuth = require('../middlewares/optionalAuth');
 const validate = require('../middlewares/validate');
 const { createBlogSchema, editBlogSchema, commentSchema } = require('../validators/blogValidators');
 const { cloudinary } = require('../config/cloudinary');
@@ -68,6 +77,14 @@ const { cloudinary } = require('../config/cloudinary');
  *                 type: string
  *                 description: Comma-separated tags for the blog
  *                 example: "JavaScript,Async,Programming"
+ *               status:
+ *                 type: string
+ *                 enum: [draft, published]
+ *                 description: Defaults to published (live immediately)
+ *               publishedAt:
+ *                 type: string
+ *                 format: date-time
+ *                 description: A future date schedules the post; omit to publish now
  *             required:
  *               - title
  *               - content
@@ -143,6 +160,22 @@ router.get('/recommend', authMiddleware, BlogController.recommendBlogs);
 
 /**
  * @swagger
+ * /blogs/mine:
+ *   get:
+ *     summary: Get the current user's own posts, of any status (draft, scheduled, or published)
+ *     tags: [Blogs]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Paginated list of the user's own posts
+ *       401:
+ *         description: Unauthorized
+ */
+router.get('/mine', authMiddleware, BlogController.getMyBlogs);
+
+/**
+ * @swagger
  * /blogs/search:
  *   get:
  *     summary: Search blogs
@@ -197,9 +230,9 @@ router.get('/', BlogController.getAllBlogs);
  *       200:
  *         description: Blog data
  *       404:
- *         description: Blog not found
+ *         description: Blog not found (also returned for a draft/scheduled post you don't own)
  */
-router.get('/:id', BlogController.getBlogById);
+router.get('/:id', optionalAuth, BlogController.getBlogById);
 
 /**
  * @swagger
@@ -239,6 +272,14 @@ router.get('/:id', BlogController.getBlogById);
  *                 type: string
  *                 description: Comma-separated tags for the blog
  *                 example: "JavaScript,Async,Programming"
+ *               status:
+ *                 type: string
+ *                 enum: [draft, published]
+ *                 description: Omit to leave unchanged; set to draft to unpublish
+ *               publishedAt:
+ *                 type: string
+ *                 format: date-time
+ *                 description: Set a future date to (re)schedule; omit to leave the existing publish date untouched
  *     responses:
  *       200:
  *         description: Blog updated successfully
@@ -349,7 +390,7 @@ router.post('/:id/comments', authMiddleware, validate(commentSchema), BlogContro
  *       200:
  *         description: List of comments
  */
-router.get('/:id/comments', BlogController.getComments);
+router.get('/:id/comments', optionalAuth, BlogController.getComments);
 
 /**
  * @swagger

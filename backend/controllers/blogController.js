@@ -6,6 +6,7 @@ const getPagination = require("../utils/pagination");
 const sanitizeContent = require("../utils/sanitizeContent");
 const { makeSlug } = require("../utils/slugify");
 const { cloudinary } = require("../config/cloudinary");
+const { publicFilter, isPublished, isVisibleTo } = require("../utils/blogVisibility");
 
 // Create a blog
 exports.createBlog = async (req, res) => {
@@ -30,6 +31,12 @@ exports.createBlog = async (req, res) => {
       });
     }
 
+    // A future publishedAt schedules the post (see utils/blogVisibility.js);
+    // omitting it on a published post publishes immediately. Drafts carry no
+    // publishedAt regardless of what was sent.
+    const status = req.body.status === "draft" ? "draft" : "published";
+    const publishedAt = status === "draft" ? null : req.body.publishedAt || new Date();
+
     const blog = new Blog({
       title,
       // Cover is uploaded directly to Cloudinary by the client; we store the URL.
@@ -37,6 +44,8 @@ exports.createBlog = async (req, res) => {
       content: sanitizeContent(content), // rich HTML — sanitized before persisting
       tags: tags ? (Array.isArray(tags) ? tags : tags.split(',').map(tag => tag.trim())) : [],
       author: req.user.id,
+      status,
+      publishedAt,
     });
 
     // Stable, unique, human-readable URL slug derived from the title.
@@ -70,17 +79,18 @@ exports.createBlog = async (req, res) => {
 };
 
 
-// Get all blogs (paginated)
+// Get all blogs (paginated). Drafts and not-yet-due scheduled posts are
+// excluded — this is the public feed.
 exports.getAllBlogs = async (req, res) => {
   try {
     const { page, limit, skip } = getPagination(req.query);
     const [blogs, total] = await Promise.all([
-      Blog.find()
+      Blog.find(publicFilter())
         .populate("author", "name")
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit),
-      Blog.countDocuments(),
+      Blog.countDocuments(publicFilter()),
     ]);
 
     res.json({
@@ -96,26 +106,19 @@ exports.getAllBlogs = async (req, res) => {
   }
 };
 
-// Get a blog by slug (preferred) or by Mongo id (backward compatible).
-// $inc + findOneAndUpdate bumps the view counter atomically as part of the
-// same lookup, rather than a separate read-then-write. The edit page reuses
-// this endpoint to load a draft for editing, which isn't a real read, so it
-// opts out with `?view=false`.
+// Get a blog by slug (preferred) or by Mongo id (backward compatible). A
+// draft, or a scheduled post whose publish date hasn't arrived, 404s for
+// anyone but its author — attach optionalAuth so req.user is available
+// without forcing anonymous readers to authenticate.
 exports.getBlogById = async (req, res) => {
   try {
     const { id } = req.params;
-    const countView = req.query.view !== "false";
-    const findAndMaybeCount = (filter) =>
-      countView
-        ? Blog.findOneAndUpdate(filter, { $inc: { views: 1 } }, { new: true })
-        : Blog.findOne(filter);
-
-    let blog = await findAndMaybeCount({ slug: id }).populate("author", "name");
+    let blog = await Blog.findOne({ slug: id }).populate("author", "name");
     if (!blog && mongoose.isValidObjectId(id)) {
-      blog = await findAndMaybeCount({ _id: id }).populate("author", "name");
+      blog = await Blog.findOne({ _id: id }).populate("author", "name");
     }
 
-    if (!blog) {
+    if (!blog || !isVisibleTo(blog, req.user)) {
       return res.status(404).json({ msg: "Blog not found" });
     }
 
@@ -124,6 +127,17 @@ exports.getBlogById = async (req, res) => {
     if (!blog.slug) {
       blog.slug = makeSlug(blog.title, blog._id);
       await blog.save();
+    }
+
+    // Count a real read: publicly live (a draft/scheduled preview is only
+    // reachable by its author anyway) and not explicitly opted out — the
+    // edit page passes ?view=false since loading a draft isn't a read.
+    // $inc stays atomic under concurrent requests; re-checking the public
+    // condition in the query guards against the post's status changing
+    // between the fetch above and this update.
+    if (req.query.view !== "false" && isPublished(blog)) {
+      await Blog.updateOne({ _id: blog._id, ...publicFilter() }, { $inc: { views: 1 } });
+      blog.views += 1;
     }
 
     if (req.user) {
@@ -169,6 +183,23 @@ exports.editBlog = async (req, res) => {
     // Cover URL: update when provided (a string sets it, null/"" clears it).
     if (req.body.titleBackgroundImageUrl !== undefined) {
       blog.titleBackgroundImageUrl = req.body.titleBackgroundImageUrl || null;
+    }
+
+    // Status/publishedAt: only touched when explicitly sent, so a plain
+    // content edit never resets an already-live post's publish date.
+    if (req.body.status !== undefined) {
+      blog.status = req.body.status;
+      if (req.body.status === "draft") {
+        blog.publishedAt = null;
+      } else if (req.body.publishedAt !== undefined) {
+        blog.publishedAt = req.body.publishedAt; // explicit publish-now/reschedule
+      } else if (!blog.publishedAt) {
+        blog.publishedAt = new Date(); // first publish, no date given: now
+      }
+      // else: was already published/scheduled and no new date was given —
+      // leave the existing publishedAt untouched.
+    } else if (req.body.publishedAt !== undefined) {
+      blog.publishedAt = req.body.publishedAt; // reschedule without changing status
     }
 
     // Keep the slug stable across edits (link permanence); backfill if missing.
@@ -229,10 +260,16 @@ exports.searchBlogs = async (req, res) => {
     // Escape the user input so regex metacharacters are treated literally
     // (prevents regex injection / ReDoS).
     const safeQuery = escapeRegex(query.trim());
+    // $and, not a spread: publicFilter() already has its own top-level $or.
     const filter = {
-      $or: [
-        { title: { $regex: safeQuery, $options: "i" } },
-        { content: { $regex: safeQuery, $options: "i" } },
+      $and: [
+        publicFilter(),
+        {
+          $or: [
+            { title: { $regex: safeQuery, $options: "i" } },
+            { content: { $regex: safeQuery, $options: "i" } },
+          ],
+        },
       ],
     };
 
@@ -287,6 +324,7 @@ exports.recommendBlogs = async (req, res) => {
     // Find blogs that match the tags but are not already read or liked by the user
     const { limit, skip } = getPagination(req.query);
     const recommendedBlogs = await Blog.find({
+      ...publicFilter(),
       tags: { $in: allTags },
       _id: { $nin: [...user.readBlogs, ...user.likedBlogs] }, // Exclude already read or liked blogs
     })
@@ -309,7 +347,7 @@ exports.likeBlog = async (req, res) => {
     const user = await User.findById(req.user.id);
     const blog = await Blog.findById(req.params.id);
 
-    if (!blog) {
+    if (!blog || !isVisibleTo(blog, req.user)) {
       return res.status(404).json({ msg: "Blog not found" });
     }
 
@@ -352,7 +390,7 @@ exports.addComment = async (req, res) => {
   try {
     const blog = await Blog.findById(req.params.id);
 
-    if (!blog) {
+    if (!blog || !isVisibleTo(blog, req.user)) {
       return res.status(404).json({ msg: "Blog not found" });
     }
 
@@ -383,7 +421,7 @@ exports.getComments = async (req, res) => {
       select: "name",
     });
 
-    if (!blog) {
+    if (!blog || !isVisibleTo(blog, req.user)) {
       return res.status(404).json({ msg: "Blog not found" });
     }
 
@@ -491,4 +529,28 @@ exports.uploadSignature = async (req, res) => {
     folder,
     signature,
   });
+};
+
+// The current user's own posts of any status (draft/scheduled/published),
+// newest first — how an author finds their drafts again.
+exports.getMyBlogs = async (req, res) => {
+  try {
+    const { page, limit, skip } = getPagination(req.query);
+    const filter = { author: req.user.id };
+    const [blogs, total] = await Promise.all([
+      Blog.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
+      Blog.countDocuments(filter),
+    ]);
+
+    res.json({
+      blogs,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send("Server error");
+  }
 };
