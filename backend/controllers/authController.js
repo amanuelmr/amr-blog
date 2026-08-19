@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const User = require("../models/User");
 const jwt = require("jsonwebtoken");
 const nodemailer = require("nodemailer");
@@ -662,3 +663,47 @@ exports.changePassword = async (req, res) => {
     })
   }
 }
+
+// Public author profile — name/bio/join date only, never email or auth fields.
+exports.getPublicProfile = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res.status(404).json({ msg: "User not found" });
+    }
+    const user = await User.findById(req.params.id).select("name bio createdAt");
+    if (!user) {
+      return res.status(404).json({ msg: "User not found" });
+    }
+    res.json(user);
+  } catch (error) {
+    console.error("Get public profile error:", error.message);
+    res.status(500).send("Server error");
+  }
+};
+
+// Update the current user's own profile (name/bio). Password changes go
+// through changePassword instead.
+exports.updateProfile = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ msg: "User not found" });
+    }
+    if (req.body.name !== undefined) user.name = req.body.name;
+    if (req.body.bio !== undefined) user.bio = req.body.bio;
+    await user.save();
+
+    res.json({
+      user: {
+        _id: user._id,
+        name: user.name,
+        bio: user.bio,
+        email: user.email,
+        verified: user.verified,
+      },
+    });
+  } catch (error) {
+    console.error("Update profile error:", error.message);
+    res.status(500).send("Server error");
+  }
+};

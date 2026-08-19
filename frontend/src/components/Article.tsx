@@ -110,10 +110,17 @@ export function Article({ id }: { id: string }) {
       </h1>
 
       <div className="mt-6 flex flex-wrap items-center gap-3 text-sm text-muted">
-        <span className="flex items-center gap-2.5">
-          <Avatar name={blog.author?.name} size={40} />
-          <span className="font-medium text-fg">{blog.author?.name ?? "Unknown"}</span>
-        </span>
+        {blog.author ? (
+          <Link href={`/author/${blog.author._id}`} className="flex items-center gap-2.5 hover:text-fg">
+            <Avatar name={blog.author.name} size={40} />
+            <span className="font-medium text-fg">{blog.author.name}</span>
+          </Link>
+        ) : (
+          <span className="flex items-center gap-2.5">
+            <Avatar />
+            <span className="font-medium text-fg">Unknown</span>
+          </span>
+        )}
         <span className="text-border">·</span>
         <span>{formatDate(blog.createdAt)}</span>
         <span className="text-border">·</span>

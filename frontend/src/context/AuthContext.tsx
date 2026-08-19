@@ -23,6 +23,7 @@ interface AuthContextValue {
   forgotPassword: (email: string) => Promise<void>;
   resetPassword: (email: string, otp: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  updateProfile: (fields: { name?: string; bio?: string }) => Promise<User>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -89,6 +90,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     []
   );
 
+  const updateProfile = useCallback(
+    async (fields: { name?: string; bio?: string }) => {
+      const res = await api<{ user: User }>("/auth/me", { method: "PUT", body: fields });
+      persist({ ...user, ...res.user });
+      return res.user;
+    },
+    [persist, user]
+  );
+
   const logout = useCallback(async () => {
     try {
       await api("/auth/logout", { method: "POST", body: {}, retryOnAuth: false });
@@ -110,6 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         forgotPassword,
         resetPassword,
         logout,
+        updateProfile,
       }}
     >
       {children}

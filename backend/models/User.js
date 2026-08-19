@@ -9,6 +9,11 @@ const UserSchema = new mongoose.Schema(
       type: String,
       required: [true, "Name is required"],
     },
+    bio: {
+      type: String,
+      maxlength: 280,
+      default: "",
+    },
     email: {
       type: String,
       required: [true, "Email is required"],

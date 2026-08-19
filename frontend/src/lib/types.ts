@@ -8,10 +8,20 @@ export interface User {
   name: string;
   email: string;
   verified: boolean;
+  bio?: string;
   likedBlogs?: string[];
   readBlogs?: string[];
   createdAt?: string;
   updatedAt?: string;
+}
+
+// GET /auth/users/:id — a user's public profile: name/bio/join date only,
+// never email or auth fields.
+export interface PublicProfile {
+  _id: string;
+  name: string;
+  bio?: string;
+  createdAt: string;
 }
 
 export interface Comment {

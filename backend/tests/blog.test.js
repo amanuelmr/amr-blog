@@ -66,6 +66,21 @@ describe('Blog API', () => {
       const res = await request(app).get(`/api/v1/blogs/${slug}`).expect(200);
       expect(res.body._id).toBe(created.body.blog._id);
     });
+
+    it("filters the feed to one author's posts for their profile page", async () => {
+      const alice = request.agent(app);
+      await registerVerifyLogin(alice, { email: 'alice@example.com', name: 'Alice' });
+      const alicePost = await createBlog(alice, { title: 'Alice post' }).expect(201);
+
+      const bob = request.agent(app);
+      await registerVerifyLogin(bob, { email: 'bob@example.com', name: 'Bob' });
+      await createBlog(bob, { title: 'Bob post' }).expect(201);
+
+      const authorId = alicePost.body.blog.author;
+      const res = await request(app).get(`/api/v1/blogs?author=${authorId}`).expect(200);
+      expect(res.body.total).toBe(1);
+      expect(res.body.blogs[0]._id).toBe(alicePost.body.blog._id);
+    });
   });
 
   describe('authorization', () => {

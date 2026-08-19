@@ -12,6 +12,8 @@ const {
   changePassword,
   resendVerificationOTP,
   debugSystemHealth,
+  getPublicProfile,
+  updateProfile,
 } = wrapAll(require("../controllers/authController"));
 const authMiddleware = require("../middlewares/authMiddleware");
 const validate = require("../middlewares/validate");
@@ -24,6 +26,7 @@ const {
   forgotPasswordSchema,
   resetPasswordSchema,
   changePasswordSchema,
+  updateProfileSchema,
 } = require("../validators/authValidators");
 
 
@@ -321,6 +324,53 @@ router.post("/reset-password", authLimiter, validate(resetPasswordSchema), reset
  *         description: Server error
  */
 router.post("/change-password", authMiddleware, validate(changePasswordSchema), changePassword);
+
+/**
+ * @swagger
+ * /auth/me:
+ *   put:
+ *     tags: [Authentication]
+ *     summary: Update the current user's profile (name/bio)
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               bio:
+ *                 type: string
+ *                 maxLength: 280
+ *     responses:
+ *       200:
+ *         description: Updated user
+ *       401:
+ *         description: Unauthorized
+ */
+router.put("/me", authMiddleware, validate(updateProfileSchema), updateProfile);
+
+/**
+ * @swagger
+ * /auth/users/{id}:
+ *   get:
+ *     tags: [Authentication]
+ *     summary: Get a user's public profile (name, bio, join date — never email or auth fields)
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Public profile
+ *       404:
+ *         description: User not found
+ */
+router.get("/users/:id", getPublicProfile);
 
 /**
  * @swagger

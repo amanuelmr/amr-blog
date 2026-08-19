@@ -80,17 +80,22 @@ exports.createBlog = async (req, res) => {
 
 
 // Get all blogs (paginated). Drafts and not-yet-due scheduled posts are
-// excluded — this is the public feed.
+// excluded — this is the public feed. An optional ?author=<userId> narrows
+// it to one author's posts, for their public profile page.
 exports.getAllBlogs = async (req, res) => {
   try {
     const { page, limit, skip } = getPagination(req.query);
+    const filter = { ...publicFilter() };
+    if (req.query.author && mongoose.isValidObjectId(req.query.author)) {
+      filter.author = req.query.author;
+    }
     const [blogs, total] = await Promise.all([
-      Blog.find(publicFilter())
+      Blog.find(filter)
         .populate("author", "name")
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit),
-      Blog.countDocuments(publicFilter()),
+      Blog.countDocuments(filter),
     ]);
 
     res.json({

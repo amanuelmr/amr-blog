@@ -217,6 +217,12 @@ router.get('/search', BlogController.searchBlogs);
  *   get:
  *     summary: Get all blogs
  *     tags: [Blogs]
+ *     parameters:
+ *       - in: query
+ *         name: author
+ *         schema:
+ *           type: string
+ *         description: Narrow to one author's published posts (their user id)
  *     responses:
  *       200:
  *         description: List of all blogs
