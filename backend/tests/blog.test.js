@@ -103,6 +103,55 @@ describe('Blog API', () => {
     });
   });
 
+  describe('bookmarks', () => {
+    it('bookmarks and unbookmarks a blog, and lists it on the reading list while saved', async () => {
+      const agent = request.agent(app);
+      await registerVerifyLogin(agent);
+      const created = await createBlog(agent).expect(201);
+      const id = created.body.blog._id;
+
+      const saved = await agent.post(`/api/v1/blogs/${id}/bookmark`).expect(200);
+      expect(saved.body.bookmarked).toBe(true);
+
+      const fetched = await agent.get(`/api/v1/blogs/${id}`).expect(200);
+      expect(fetched.body.bookmarked).toBe(true);
+
+      const list = await agent.get('/api/v1/blogs/bookmarks').expect(200);
+      expect(list.body.total).toBe(1);
+      expect(list.body.blogs[0]._id).toBe(id);
+
+      const unsaved = await agent.post(`/api/v1/blogs/${id}/bookmark`).expect(200);
+      expect(unsaved.body.bookmarked).toBe(false);
+
+      const listAfter = await agent.get('/api/v1/blogs/bookmarks').expect(200);
+      expect(listAfter.body.total).toBe(0);
+    });
+
+    it("a post that goes private again silently drops off the reading list", async () => {
+      const agent = request.agent(app);
+      await registerVerifyLogin(agent);
+      const created = await createBlog(agent).expect(201);
+      const id = created.body.blog._id;
+
+      await agent.post(`/api/v1/blogs/${id}/bookmark`).expect(200);
+      await agent.put(`/api/v1/blogs/${id}`).send({ status: 'draft' }).expect(200);
+
+      const list = await agent.get('/api/v1/blogs/bookmarks').expect(200);
+      expect(list.body.total).toBe(0);
+    });
+
+    it("blocks bookmarking someone else's draft", async () => {
+      const owner = request.agent(app);
+      await registerVerifyLogin(owner);
+      const created = await createBlog(owner, { status: 'draft' }).expect(201);
+      const id = created.body.blog._id;
+
+      const other = request.agent(app);
+      await registerVerifyLogin(other, { email: 'saver@example.com', name: 'Saver' });
+      await other.post(`/api/v1/blogs/${id}/bookmark`).expect(404);
+    });
+  });
+
   describe('comments', () => {
     it('adds, lists, edits and deletes a comment', async () => {
       const agent = request.agent(app);

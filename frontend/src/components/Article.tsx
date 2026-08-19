@@ -10,6 +10,7 @@ import { CoverImage } from "./CoverImage";
 import { Avatar } from "./Avatar";
 import { TagChip } from "./TagChip";
 import { LikeButton } from "./LikeButton";
+import { BookmarkButton } from "./BookmarkButton";
 import { CommentSection } from "./CommentSection";
 import { TableOfContents } from "./TableOfContents";
 import { Spinner, ErrorState } from "./states";
@@ -155,6 +156,7 @@ export function Article({ id }: { id: string }) {
 
       <div className="mt-10 flex items-center gap-4 border-t border-border pt-6">
         <LikeButton blogId={blog._id} initialLikes={blog.likes ?? []} />
+        <BookmarkButton blogId={blog._id} initialBookmarked={blog.bookmarked ?? false} />
         <span className="text-sm text-muted">
           {blog.comments?.length ?? 0} comment{(blog.comments?.length ?? 0) === 1 ? "" : "s"}
         </span>

@@ -40,6 +40,7 @@ const UserSchema = new mongoose.Schema(
 
     readBlogs: [{ type: mongoose.Schema.Types.ObjectId, ref: "Blog" }],
     likedBlogs: [{ type: mongoose.Schema.Types.ObjectId, ref: "Blog" }],
+    bookmarkedBlogs: [{ type: mongoose.Schema.Types.ObjectId, ref: "Blog" }], // "Read later" list
   },
   { timestamps: true }
 );

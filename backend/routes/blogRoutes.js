@@ -176,6 +176,22 @@ router.get('/mine', authMiddleware, BlogController.getMyBlogs);
 
 /**
  * @swagger
+ * /blogs/bookmarks:
+ *   get:
+ *     summary: Get the current user's reading list (bookmarked posts)
+ *     tags: [Blogs]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Paginated list of the user's bookmarked posts
+ *       401:
+ *         description: Unauthorized
+ */
+router.get('/bookmarks', authMiddleware, BlogController.getBookmarks);
+
+/**
+ * @swagger
  * /blogs/search:
  *   get:
  *     summary: Search blogs
@@ -339,6 +355,31 @@ router.delete('/:id', authMiddleware, BlogController.deleteBlog);
  *         description: Unauthorized
  */
 router.post('/:id/like', authMiddleware, BlogController.likeBlog);
+
+/**
+ * @swagger
+ * /blogs/{id}/bookmark:
+ *   post:
+ *     summary: Toggle saving a blog to the current user's reading list
+ *     tags: [Blogs]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Blog ID
+ *     responses:
+ *       200:
+ *         description: "{ bookmarked: boolean } — the new state"
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Blog not found
+ */
+router.post('/:id/bookmark', authMiddleware, BlogController.toggleBookmark);
 
 /**
  * @swagger

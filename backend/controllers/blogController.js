@@ -140,16 +140,24 @@ exports.getBlogById = async (req, res) => {
       blog.views += 1;
     }
 
+    // `bookmarked` reflects the requester's own saved posts (bookmarks live
+    // on User, not Blog, so it can't be derived from the blog doc alone).
+    let bookmarked = false;
     if (req.user) {
       const user = await User.findById(req.user.id);
-      const already = user?.readBlogs?.some((b) => b.toString() === blog._id.toString());
-      if (user && !already) {
-        user.readBlogs.push(blog._id);
-        await user.save();
+      if (user) {
+        bookmarked = user.bookmarkedBlogs.some((b) => b.toString() === blog._id.toString());
+        const alreadyRead = user.readBlogs.some((b) => b.toString() === blog._id.toString());
+        if (!alreadyRead) {
+          user.readBlogs.push(blog._id);
+          await user.save();
+        }
       }
     }
 
-    res.json(blog);
+    const payload = blog.toObject();
+    payload.bookmarked = bookmarked;
+    res.json(payload);
   } catch (err) {
     console.error(err.message);
     res.status(500).send("Server error");
@@ -371,6 +379,58 @@ exports.likeBlog = async (req, res) => {
     await blog.save();
 
     res.json(blog);
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).send("Server error");
+  }
+};
+
+// Save/unsave a blog to the current user's reading list. Bookmarks live on
+// User, not Blog, so (unlike likeBlog) this doesn't touch the blog doc.
+exports.toggleBookmark = async (req, res) => {
+  try {
+    const blog = await Blog.findById(req.params.id);
+    if (!blog || !isVisibleTo(blog, req.user)) {
+      return res.status(404).json({ msg: "Blog not found" });
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ msg: "User not found" });
+    }
+
+    const already = user.bookmarkedBlogs.some((id) => id.toString() === req.params.id);
+    if (already) {
+      user.bookmarkedBlogs = user.bookmarkedBlogs.filter((id) => id.toString() !== req.params.id);
+    } else {
+      user.bookmarkedBlogs.push(req.params.id);
+    }
+    await user.save();
+
+    res.json({ bookmarked: !already });
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).send("Server error");
+  }
+};
+
+// The current user's reading list, newest-post-first. A post that's since
+// gone private again (or been deleted) is silently excluded, not surfaced.
+exports.getBookmarks = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ msg: "User not found" });
+    }
+
+    const { page, limit, skip } = getPagination(req.query);
+    const filter = { _id: { $in: user.bookmarkedBlogs }, ...publicFilter() };
+    const [blogs, total] = await Promise.all([
+      Blog.find(filter).populate("author", "name").sort({ createdAt: -1 }).skip(skip).limit(limit),
+      Blog.countDocuments(filter),
+    ]);
+
+    res.json({ blogs, total, page, limit, totalPages: Math.ceil(total / limit) });
   } catch (error) {
     console.error(error.message);
     res.status(500).send("Server error");

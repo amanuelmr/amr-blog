@@ -39,6 +39,9 @@ export interface Blog {
   // A "published" post with a future publishedAt is scheduled, not live yet.
   publishedAt?: string | null;
   likes: string[];
+  // Present only when fetched by the owner/a logged-in reader (computed
+  // against their own reading list — bookmarks live on User, not Blog).
+  bookmarked?: boolean;
   shares: number;
   views: number;
   comments: Comment[];
