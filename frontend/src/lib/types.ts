@@ -20,6 +20,9 @@ export interface Comment {
   text: string;
   createdAt: string;
   editedAt?: string;
+  // Set on a reply; always points at a top-level comment (replies are one
+  // level deep — replying to a reply threads under its original parent).
+  parentComment?: string | null;
 }
 
 export type BlogStatus = "draft" | "published";

@@ -140,6 +140,77 @@ describe('Blog API', () => {
       const id = created.body.blog._id;
       await agent.post(`/api/v1/blogs/${id}/comments`).send({ text: '   ' }).expect(400);
     });
+
+    describe('threaded replies', () => {
+      it('replies to a top-level comment and lists them alongside it', async () => {
+        const agent = request.agent(app);
+        await registerVerifyLogin(agent);
+        const created = await createBlog(agent).expect(201);
+        const id = created.body.blog._id;
+
+        const top = await agent.post(`/api/v1/blogs/${id}/comments`).send({ text: 'Top-level' }).expect(201);
+        const topId = top.body.comment._id;
+
+        const reply = await agent
+          .post(`/api/v1/blogs/${id}/comments`)
+          .send({ text: 'A reply', parentComment: topId })
+          .expect(201);
+        expect(reply.body.comment.parentComment).toBe(topId);
+
+        const listed = await request(app).get(`/api/v1/blogs/${id}/comments`).expect(200);
+        // total counts threads (top-level only), not replies
+        expect(listed.body.total).toBe(1);
+        expect(listed.body.comments).toHaveLength(2);
+      });
+
+      it('collapses a reply-to-a-reply onto the original top-level comment', async () => {
+        const agent = request.agent(app);
+        await registerVerifyLogin(agent);
+        const created = await createBlog(agent).expect(201);
+        const id = created.body.blog._id;
+
+        const top = await agent.post(`/api/v1/blogs/${id}/comments`).send({ text: 'Top-level' }).expect(201);
+        const topId = top.body.comment._id;
+        const reply = await agent
+          .post(`/api/v1/blogs/${id}/comments`)
+          .send({ text: 'First reply', parentComment: topId })
+          .expect(201);
+
+        const nested = await agent
+          .post(`/api/v1/blogs/${id}/comments`)
+          .send({ text: 'Reply to the reply', parentComment: reply.body.comment._id })
+          .expect(201);
+        expect(nested.body.comment.parentComment).toBe(topId);
+      });
+
+      it('rejects a reply to a nonexistent comment', async () => {
+        const agent = request.agent(app);
+        await registerVerifyLogin(agent);
+        const created = await createBlog(agent).expect(201);
+        const id = created.body.blog._id;
+        await agent
+          .post(`/api/v1/blogs/${id}/comments`)
+          .send({ text: 'Orphan reply', parentComment: '000000000000000000000000' })
+          .expect(400);
+      });
+
+      it('deleting a top-level comment cascades to its replies', async () => {
+        const agent = request.agent(app);
+        await registerVerifyLogin(agent);
+        const created = await createBlog(agent).expect(201);
+        const id = created.body.blog._id;
+
+        const top = await agent.post(`/api/v1/blogs/${id}/comments`).send({ text: 'Top-level' }).expect(201);
+        const topId = top.body.comment._id;
+        await agent.post(`/api/v1/blogs/${id}/comments`).send({ text: 'A reply', parentComment: topId }).expect(201);
+
+        await agent.delete(`/api/v1/blogs/${id}/comments/${topId}`).expect(200);
+
+        const listed = await request(app).get(`/api/v1/blogs/${id}/comments`).expect(200);
+        expect(listed.body.total).toBe(0);
+        expect(listed.body.comments).toHaveLength(0);
+      });
+    });
   });
 
   describe('draft & scheduled visibility', () => {

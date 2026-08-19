@@ -49,6 +49,12 @@ const commentSchema = z.object({
     .trim()
     .min(1, "Comment text is required and must be non-empty.")
     .max(2000, "Comment is too long (max 2000 characters)."),
+  // Present to post a reply; the controller resolves it to its top-level
+  // ancestor (replies are one level deep).
+  parentComment: z
+    .string()
+    .regex(/^[0-9a-fA-F]{24}$/, "Invalid comment id")
+    .optional(),
 });
 
 module.exports = { createBlogSchema, editBlogSchema, commentSchema };

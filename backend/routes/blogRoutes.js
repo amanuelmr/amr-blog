@@ -365,6 +365,9 @@ router.post('/:id/like', authMiddleware, BlogController.likeBlog);
  *               text:
  *                 type: string
  *                 example: "Great post!"
+ *               parentComment:
+ *                 type: string
+ *                 description: Id of the comment being replied to; omit for a top-level comment. Replies are one level deep — replying to a reply threads under its original parent.
  *     responses:
  *       201:
  *         description: Comment added successfully

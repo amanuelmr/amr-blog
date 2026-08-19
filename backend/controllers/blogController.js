@@ -379,7 +379,7 @@ exports.likeBlog = async (req, res) => {
 
 // Add a comment to a blog
 exports.addComment = async (req, res) => {
-  const { text } = req.body;
+  const { text, parentComment } = req.body;
 
   if (!text || typeof text !== "string" || text.trim().length === 0) {
     return res
@@ -394,9 +394,21 @@ exports.addComment = async (req, res) => {
       return res.status(404).json({ msg: "Blog not found" });
     }
 
+    let resolvedParent = null;
+    if (parentComment) {
+      const parent = blog.comments.id(parentComment);
+      if (!parent) {
+        return res.status(400).json({ msg: "Parent comment not found" });
+      }
+      // Replies are one level deep: a reply to a reply threads under the
+      // original top-level comment instead of nesting further.
+      resolvedParent = parent.parentComment || parent._id;
+    }
+
     const newComment = {
       user: req.user.id,
       text: text.trim(),
+      parentComment: resolvedParent,
     };
 
     blog.comments.unshift(newComment);
@@ -425,13 +437,20 @@ exports.getComments = async (req, res) => {
       return res.status(404).json({ msg: "Blog not found" });
     }
 
-    // Comments are embedded, so paginate in memory.
+    // Comments are embedded, so paginate in memory. Threads paginate by
+    // top-level comment; every reply for a page's threads comes along
+    // unpaginated (there are usually few per thread).
     const { page, limit, skip } = getPagination(req.query);
-    const total = blog.comments.length;
-    const comments = blog.comments.slice(skip, skip + limit);
+    const topLevel = blog.comments.filter((c) => !c.parentComment);
+    const total = topLevel.length;
+    const pageTopLevel = topLevel.slice(skip, skip + limit);
+    const pageIds = new Set(pageTopLevel.map((c) => c._id.toString()));
+    const replies = blog.comments
+      .filter((c) => c.parentComment && pageIds.has(c.parentComment.toString()))
+      .sort((a, b) => a.createdAt - b.createdAt);
 
     res.json({
-      comments,
+      comments: [...pageTopLevel, ...replies],
       total,
       page,
       limit,
@@ -462,7 +481,13 @@ exports.deleteComment = async (req, res) => {
         .status(401)
         .json({ msg: "User not authorized to delete this comment" });
     }
+
+    // Deleting a top-level comment also removes its replies.
+    blog.comments
+      .filter((c) => c.parentComment && c.parentComment.toString() === comment._id.toString())
+      .forEach((reply) => blog.comments.pull(reply._id));
     blog.comments.pull(comment._id);
+
     await blog.save();
 
     res.json({ msg: "Comment removed successfully" });

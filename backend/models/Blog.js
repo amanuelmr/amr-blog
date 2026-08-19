@@ -5,7 +5,10 @@ const commentSchema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }, // Reference to the user who commented
   text: { type: String, required: true }, // The comment text
   createdAt: { type: Date, default: Date.now },
-  editedAt: { type: Date } // Set when a comment is edited; createdAt stays intact
+  editedAt: { type: Date }, // Set when a comment is edited; createdAt stays intact
+  // Set on a reply; always points at a top-level comment's _id within the
+  // same blog.comments array. Replies are one level deep — see addComment.
+  parentComment: { type: mongoose.Schema.Types.ObjectId, default: null },
 });
 
 const blogSchema = new mongoose.Schema({
