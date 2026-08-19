@@ -187,6 +187,12 @@ router.get('/', BlogController.getAllBlogs);
  *         schema:
  *           type: string
  *         description: Blog ID
+ *       - in: query
+ *         name: view
+ *         schema:
+ *           type: string
+ *           enum: [false]
+ *         description: Pass `view=false` to load the post without counting it as a view (e.g. loading a draft to edit)
  *     responses:
  *       200:
  *         description: Blog data

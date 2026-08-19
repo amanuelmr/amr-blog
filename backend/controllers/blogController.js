@@ -98,21 +98,21 @@ exports.getAllBlogs = async (req, res) => {
 
 // Get a blog by slug (preferred) or by Mongo id (backward compatible).
 // $inc + findOneAndUpdate bumps the view counter atomically as part of the
-// same lookup, rather than a separate read-then-write.
+// same lookup, rather than a separate read-then-write. The edit page reuses
+// this endpoint to load a draft for editing, which isn't a real read, so it
+// opts out with `?view=false`.
 exports.getBlogById = async (req, res) => {
   try {
     const { id } = req.params;
-    let blog = await Blog.findOneAndUpdate(
-      { slug: id },
-      { $inc: { views: 1 } },
-      { new: true }
-    ).populate("author", "name");
+    const countView = req.query.view !== "false";
+    const findAndMaybeCount = (filter) =>
+      countView
+        ? Blog.findOneAndUpdate(filter, { $inc: { views: 1 } }, { new: true })
+        : Blog.findOne(filter);
+
+    let blog = await findAndMaybeCount({ slug: id }).populate("author", "name");
     if (!blog && mongoose.isValidObjectId(id)) {
-      blog = await Blog.findOneAndUpdate(
-        { _id: id },
-        { $inc: { views: 1 } },
-        { new: true }
-      ).populate("author", "name");
+      blog = await findAndMaybeCount({ _id: id }).populate("author", "name");
     }
 
     if (!blog) {

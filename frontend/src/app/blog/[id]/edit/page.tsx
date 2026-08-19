@@ -19,7 +19,8 @@ function EditInner({ id }: { id: string }) {
     setLoading(true);
     setError("");
     try {
-      setBlog(await api<Blog>(`/blogs/${id}`));
+      // Loading a draft to edit isn't a real read — don't count it as a view.
+      setBlog(await api<Blog>(`/blogs/${id}?view=false`));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not load the article.");
     } finally {

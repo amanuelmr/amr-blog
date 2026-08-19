@@ -17,7 +17,11 @@ function escapeXml(value: string): string {
 
 function itemXml(blog: Blog): string {
   const url = `${SITE_URL}${blogHref(blog)}`;
-  const author = blog.author?.name ? `<author>${escapeXml(blog.author.name)}</author>` : "";
+  // RSS 2.0's <author> is defined as an email address, which we don't want to
+  // expose publicly. dc:creator is the standard way to publish a plain name.
+  const author = blog.author?.name
+    ? `<dc:creator>${escapeXml(blog.author.name)}</dc:creator>`
+    : "";
   return `  <item>
     <title>${escapeXml(blog.title)}</title>
     <link>${url}</link>
@@ -41,7 +45,7 @@ export async function GET() {
   }
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0">
+<rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/">
 <channel>
   <title>AMR Blog</title>
   <link>${SITE_URL}</link>
