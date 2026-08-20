@@ -33,8 +33,17 @@ export function FeaturedLead({ blog }: { blog: Blog }) {
           </p>
 
           <div className="mt-6 flex items-center gap-2.5 text-sm text-muted">
-            <Avatar name={blog.author?.name} size={30} />
-            <span className="font-medium text-fg">{blog.author?.name ?? "Unknown"}</span>
+            {blog.author ? (
+              <Link href={`/author/${blog.author._id}`} className="flex items-center gap-2.5 hover:text-fg">
+                <Avatar name={blog.author.name} size={30} />
+                <span className="font-medium text-fg">{blog.author.name}</span>
+              </Link>
+            ) : (
+              <>
+                <Avatar size={30} />
+                <span className="font-medium text-fg">Unknown</span>
+              </>
+            )}
             <span className="text-border">·</span>
             <span className="tabular-nums">{formatDate(blog.createdAt)}</span>
             <span className="text-border">·</span>

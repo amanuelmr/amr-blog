@@ -5,7 +5,10 @@ const commentSchema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }, // Reference to the user who commented
   text: { type: String, required: true }, // The comment text
   createdAt: { type: Date, default: Date.now },
-  editedAt: { type: Date } // Set when a comment is edited; createdAt stays intact
+  editedAt: { type: Date }, // Set when a comment is edited; createdAt stays intact
+  // Set on a reply; always points at a top-level comment's _id within the
+  // same blog.comments array. Replies are one level deep — see addComment.
+  parentComment: { type: mongoose.Schema.Types.ObjectId, default: null },
 });
 
 const blogSchema = new mongoose.Schema({
@@ -18,8 +21,14 @@ const blogSchema = new mongoose.Schema({
   author: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   tags: [String],
   createdAt: { type: Date, default: Date.now },
+  // "published" with a future publishedAt is how a scheduled post stays
+  // hidden until then (see utils/blogVisibility.js) — no separate
+  // "scheduled" status needed.
+  status: { type: String, enum: ["draft", "published"], default: "published" },
+  publishedAt: { type: Date },
   likes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], // Array to store users who liked the post
   shares: { type: Number, default: 0 }, // Counter for shares
+  views: { type: Number, default: 0 }, // Counter for reads, bumped on each fetch by id/slug
   comments: [commentSchema] // Array of comment sub-documents
 });
 

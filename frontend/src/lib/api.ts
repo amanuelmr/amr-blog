@@ -18,6 +18,24 @@ export const API_ORIGIN = (() => {
   }
 })();
 
+/**
+ * Absolute API base for server-side code (route handlers, sitemap
+ * generation) that has no browser to resolve a relative NEXT_PUBLIC_API_URL
+ * against. Requires BACKEND_URL — the same var the same-origin proxy
+ * rewrites to (see next.config.mjs) — rather than guessing a backend origin,
+ * since a wrong guess would silently point sitemap/RSS at the wrong deploy.
+ */
+export function serverApiBase(): string {
+  if (!BASE_URL.startsWith("/")) return BASE_URL;
+  const backend = process.env.BACKEND_URL;
+  if (!backend) {
+    throw new Error(
+      "BACKEND_URL must be set when NEXT_PUBLIC_API_URL is a relative path (same-origin proxy mode) — server-side code has no browser to resolve it against."
+    );
+  }
+  return `${backend.replace(/\/+$/, "")}${BASE_URL}`;
+}
+
 export class ApiError extends Error {
   status: number;
   data: unknown;

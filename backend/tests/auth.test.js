@@ -1,6 +1,6 @@
 const request = require('supertest');
 const app = require('../index');
-const { getLastOtp, registerAndVerify, defaultUser } = require('./helpers');
+const { getLastOtp, registerAndVerify, registerVerifyLogin, defaultUser } = require('./helpers');
 
 describe('Auth flows', () => {
   describe('register', () => {
@@ -146,6 +146,42 @@ describe('Auth flows', () => {
         .post('/api/v1/auth/login')
         .send({ email: defaultUser.email, password: 'newpassword123' })
         .expect(200);
+    });
+  });
+
+  describe('profile', () => {
+    it("lets a user update their own bio, and exposes it on their public profile", async () => {
+      const agent = request.agent(app);
+      const user = await registerVerifyLogin(agent);
+
+      const updated = await agent
+        .put('/api/v1/auth/me')
+        .send({ bio: 'I write about backend systems.' })
+        .expect(200);
+      expect(updated.body.user.bio).toBe('I write about backend systems.');
+
+      const userId = updated.body.user._id;
+      const profile = await request(app).get(`/api/v1/auth/users/${userId}`).expect(200);
+      expect(profile.body.name).toBe(user.name);
+      expect(profile.body.bio).toBe('I write about backend systems.');
+      // Never leak sensitive fields on the public profile
+      expect(profile.body.email).toBeUndefined();
+      expect(profile.body.password).toBeUndefined();
+    });
+
+    it('requires authentication to update a profile', async () => {
+      await request(app).put('/api/v1/auth/me').send({ bio: 'nope' }).expect(401);
+    });
+
+    it('404s for a public profile that does not exist', async () => {
+      await request(app).get('/api/v1/auth/users/000000000000000000000000').expect(404);
+      await request(app).get('/api/v1/auth/users/not-an-id').expect(404);
+    });
+
+    it('rejects a bio over 280 characters', async () => {
+      const agent = request.agent(app);
+      await registerVerifyLogin(agent);
+      await agent.put('/api/v1/auth/me').send({ bio: 'x'.repeat(281) }).expect(400);
     });
   });
 });

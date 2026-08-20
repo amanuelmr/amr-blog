@@ -9,6 +9,11 @@ const UserSchema = new mongoose.Schema(
       type: String,
       required: [true, "Name is required"],
     },
+    bio: {
+      type: String,
+      maxlength: 280,
+      default: "",
+    },
     email: {
       type: String,
       required: [true, "Email is required"],
@@ -40,6 +45,7 @@ const UserSchema = new mongoose.Schema(
 
     readBlogs: [{ type: mongoose.Schema.Types.ObjectId, ref: "Blog" }],
     likedBlogs: [{ type: mongoose.Schema.Types.ObjectId, ref: "Blog" }],
+    bookmarkedBlogs: [{ type: mongoose.Schema.Types.ObjectId, ref: "Blog" }], // "Read later" list
   },
   { timestamps: true }
 );

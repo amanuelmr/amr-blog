@@ -31,6 +31,12 @@ const changePasswordSchema = z.object({
   newPassword: password,
 });
 
+// All fields optional: an update may touch just the bio.
+const updateProfileSchema = z.object({
+  name: z.string().trim().min(3, "Name must be at least 3 characters").max(255).optional(),
+  bio: z.string().trim().max(280, "Bio is too long (max 280 characters)").optional(),
+});
+
 module.exports = {
   registerSchema,
   loginSchema,
@@ -39,4 +45,5 @@ module.exports = {
   forgotPasswordSchema,
   resetPasswordSchema,
   changePasswordSchema,
+  updateProfileSchema,
 };

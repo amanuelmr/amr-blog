@@ -3,14 +3,23 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
-import { Blog } from "@/lib/types";
+import { Blog, BlogStatus } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
 import { FormAlert } from "@/components/AuthCard";
 import { RichTextEditor } from "@/components/editor/RichTextEditor";
 import { CoverImageInput } from "@/components/editor/CoverImageInput";
 import { TagInput } from "@/components/ui/TagInput";
-import { stripHtml, contentToHtml, blogHref } from "@/lib/format";
+import { stripHtml, contentToHtml, blogHref, publishState } from "@/lib/format";
 import { uploadToCloudinary } from "@/lib/uploadToCloudinary";
+
+type Action = "draft" | "publish" | "schedule";
+
+// datetime-local wants "YYYY-MM-DDTHH:mm" in local time (no timezone).
+function toDateTimeLocal(iso: string): string {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
 
 export function BlogForm({ mode, blog }: { mode: "create" | "edit"; blog?: Blog }) {
   const router = useRouter();
@@ -23,6 +32,16 @@ export function BlogForm({ mode, blog }: { mode: "create" | "edit"; blog?: Blog 
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const titleRef = useRef<HTMLTextAreaElement>(null);
+
+  const wasAlreadyLive = !!blog && publishState(blog) === "live";
+  const [action, setAction] = useState<Action>(() => {
+    if (!blog) return "publish"; // create: matches the previous always-publish behavior
+    if (blog.status === "draft") return "draft";
+    return publishState(blog) === "scheduled" ? "schedule" : "publish";
+  });
+  const [scheduledFor, setScheduledFor] = useState<string>(() =>
+    blog && publishState(blog) === "scheduled" && blog.publishedAt ? toDateTimeLocal(blog.publishedAt) : ""
+  );
 
   // Auto-grow the borderless title as it wraps.
   useEffect(() => {
@@ -43,11 +62,30 @@ export function BlogForm({ mode, blog }: { mode: "create" | "edit"; blog?: Blog 
     setPreview(null);
   }
 
+  // A future publishedAt schedules the post; omitting it on "publish" only
+  // sends "now" the first time (wasAlreadyLive), so re-saving a live post
+  // never resets its original publish date.
+  function statusPayload(): { status: BlogStatus; publishedAt?: string | null } {
+    if (action === "draft") return { status: "draft", publishedAt: null };
+    if (action === "schedule") return { status: "published", publishedAt: new Date(scheduledFor).toISOString() };
+    return wasAlreadyLive ? { status: "published" } : { status: "published", publishedAt: new Date().toISOString() };
+  }
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim() || !stripHtml(content).trim()) {
-      setError("A title and some content are required to publish.");
+      setError("A title and some content are required.");
       return;
+    }
+    if (action === "schedule") {
+      if (!scheduledFor) {
+        setError("Pick a date and time to schedule for, or choose Publish now.");
+        return;
+      }
+      if (new Date(scheduledFor).getTime() <= Date.now()) {
+        setError("Scheduled time must be in the future — pick a later time, or choose Publish now.");
+        return;
+      }
     }
     setSaving(true);
     setError("");
@@ -67,10 +105,11 @@ export function BlogForm({ mode, blog }: { mode: "create" | "edit"; blog?: Blog 
             content,
             tags,
             titleBackgroundImageUrl: coverUrl,
+            ...statusPayload(),
           },
         }
       );
-      router.push(blogHref(res.blog));
+      router.push(res.blog.status === "draft" ? "/write/mine" : blogHref(res.blog));
       router.refresh();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not save the article.");
@@ -78,11 +117,14 @@ export function BlogForm({ mode, blog }: { mode: "create" | "edit"; blog?: Blog 
     }
   }
 
+  const submitLabel =
+    action === "draft" ? "Save draft" : action === "schedule" ? "Schedule" : wasAlreadyLive ? "Save changes" : "Publish";
+
   return (
     <form onSubmit={onSubmit}>
       {/* Sticky composer bar */}
       <div className="sticky top-16 z-30 border-b border-border bg-bg/80 backdrop-blur">
-        <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 px-5 py-3">
+        <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3 px-5 py-3">
           <button
             type="button"
             onClick={() => router.back()}
@@ -90,12 +132,28 @@ export function BlogForm({ mode, blog }: { mode: "create" | "edit"; blog?: Blog 
           >
             ← Back
           </button>
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-muted">
-              {mode === "create" ? "Draft" : "Editing"}
-            </span>
+          <div className="flex items-center gap-2">
+            <select
+              value={action}
+              onChange={(e) => setAction(e.target.value as Action)}
+              aria-label="Publish action"
+              className="rounded-lg border border-border bg-card px-2.5 py-1.5 text-sm text-fg focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
+            >
+              <option value="draft">Draft</option>
+              <option value="publish">{wasAlreadyLive ? "Published" : "Publish now"}</option>
+              <option value="schedule">Schedule…</option>
+            </select>
+            {action === "schedule" && (
+              <input
+                type="datetime-local"
+                value={scheduledFor}
+                onChange={(e) => setScheduledFor(e.target.value)}
+                aria-label="Scheduled publish time"
+                className="rounded-lg border border-border bg-card px-2.5 py-1.5 text-sm text-fg focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
+              />
+            )}
             <Button type="submit" size="sm" loading={saving}>
-              {mode === "create" ? "Publish" : "Save changes"}
+              {submitLabel}
             </Button>
           </div>
         </div>

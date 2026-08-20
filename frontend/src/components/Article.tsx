@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Blog } from "@/lib/types";
@@ -10,9 +10,13 @@ import { CoverImage } from "./CoverImage";
 import { Avatar } from "./Avatar";
 import { TagChip } from "./TagChip";
 import { LikeButton } from "./LikeButton";
+import { BookmarkButton } from "./BookmarkButton";
 import { CommentSection } from "./CommentSection";
+import { TableOfContents } from "./TableOfContents";
 import { Spinner, ErrorState } from "./states";
-import { formatDate, readingTime, contentToHtml } from "@/lib/format";
+import { formatDate, readingTime, contentToHtml, publishState } from "@/lib/format";
+import { withHeadingAnchors } from "@/lib/toc";
+import { enhanceCodeBlocks } from "@/lib/codeHighlight";
 import DOMPurify from "isomorphic-dompurify";
 
 export function Article({ id }: { id: string }) {
@@ -22,6 +26,19 @@ export function Article({ id }: { id: string }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [deleting, setDeleting] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  // Content is sanitized server-side on save; sanitize again here (DOMPurify)
+  // as defense-in-depth before injecting it into the DOM.
+  const { html, headings } = useMemo(() => {
+    if (!blog) return { html: "", headings: [] };
+    const sanitized = DOMPurify.sanitize(contentToHtml(blog.content));
+    return withHeadingAnchors(sanitized);
+  }, [blog]);
+
+  useEffect(() => {
+    if (contentRef.current) enhanceCodeBlocks(contentRef.current);
+  }, [html]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -64,15 +81,21 @@ export function Article({ id }: { id: string }) {
     );
 
   const isOwner = !!user && !!blog.author && blog.author._id === user._id;
-  // Content is sanitized server-side on save; sanitize again here (DOMPurify)
-  // as defense-in-depth before injecting it into the DOM.
-  const html = DOMPurify.sanitize(contentToHtml(blog.content));
+  const state = publishState(blog);
 
   return (
     <article className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
       <Link href="/" className="mb-8 inline-flex items-center gap-1 text-sm text-muted hover:text-fg">
         ← All articles
       </Link>
+
+      {isOwner && state !== "live" && (
+        <div className="mb-6 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-sm text-amber-700 dark:text-amber-400">
+          {state === "draft"
+            ? "This is a draft — only you can see it."
+            : `Scheduled to publish on ${formatDate(blog.publishedAt ?? undefined)} — only you can see it until then.`}
+        </div>
+      )}
 
       {blog.tags?.length > 0 && (
         <div className="mb-4 flex flex-wrap gap-1.5">
@@ -87,14 +110,23 @@ export function Article({ id }: { id: string }) {
       </h1>
 
       <div className="mt-6 flex flex-wrap items-center gap-3 text-sm text-muted">
-        <span className="flex items-center gap-2.5">
-          <Avatar name={blog.author?.name} size={40} />
-          <span className="font-medium text-fg">{blog.author?.name ?? "Unknown"}</span>
-        </span>
+        {blog.author ? (
+          <Link href={`/author/${blog.author._id}`} className="flex items-center gap-2.5 hover:text-fg">
+            <Avatar name={blog.author.name} size={40} />
+            <span className="font-medium text-fg">{blog.author.name}</span>
+          </Link>
+        ) : (
+          <span className="flex items-center gap-2.5">
+            <Avatar />
+            <span className="font-medium text-fg">Unknown</span>
+          </span>
+        )}
         <span className="text-border">·</span>
         <span>{formatDate(blog.createdAt)}</span>
         <span className="text-border">·</span>
         <span>{readingTime(blog.content)} min read</span>
+        <span className="text-border">·</span>
+        <span>{blog.views.toLocaleString()} view{blog.views === 1 ? "" : "s"}</span>
 
         {isOwner && (
           <span className="ml-auto flex gap-2">
@@ -121,13 +153,17 @@ export function Article({ id }: { id: string }) {
         </div>
       )}
 
+      <TableOfContents headings={headings} />
+
       <div
+        ref={contentRef}
         className="prose prose-stone dark:prose-invert prose-lg mt-10 max-w-none prose-a:text-accent prose-img:rounded-xl"
         dangerouslySetInnerHTML={{ __html: html }}
       />
 
       <div className="mt-10 flex items-center gap-4 border-t border-border pt-6">
         <LikeButton blogId={blog._id} initialLikes={blog.likes ?? []} />
+        <BookmarkButton blogId={blog._id} initialBookmarked={blog.bookmarked ?? false} />
         <span className="text-sm text-muted">
           {blog.comments?.length ?? 0} comment{(blog.comments?.length ?? 0) === 1 ? "" : "s"}
         </span>
