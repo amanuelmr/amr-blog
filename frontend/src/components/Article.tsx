@@ -8,11 +8,11 @@ import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { CoverImage } from "./CoverImage";
 import { Avatar } from "./Avatar";
-import { TagChip } from "./TagChip";
 import { LikeButton } from "./LikeButton";
 import { BookmarkButton } from "./BookmarkButton";
 import { CommentSection } from "./CommentSection";
 import { TableOfContents } from "./TableOfContents";
+import { ReadingProgress } from "./ReadingProgress";
 import { Spinner, ErrorState } from "./states";
 import { formatDate, readingTime, contentToHtml, publishState } from "@/lib/format";
 import { withHeadingAnchors } from "@/lib/toc";
@@ -27,6 +27,7 @@ export function Article({ id }: { id: string }) {
   const [error, setError] = useState("");
   const [deleting, setDeleting] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
+  const articleRef = useRef<HTMLElement>(null);
 
   // Content is sanitized server-side on save; sanitize again here (DOMPurify)
   // as defense-in-depth before injecting it into the DOM.
@@ -69,10 +70,10 @@ export function Article({ id }: { id: string }) {
     }
   }
 
-  if (loading) return <div className="mx-auto max-w-3xl px-4 sm:px-6"><Spinner label="Loading article…" /></div>;
+  if (loading) return <div className="mx-auto max-w-[42rem] px-5 sm:px-6"><Spinner label="Loading article…" /></div>;
   if (error || !blog)
     return (
-      <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
+      <div className="mx-auto max-w-[42rem] px-5 py-10 sm:px-6">
         <ErrorState message={error || "Article not found."} onRetry={load} />
         <div className="mt-6 text-center">
           <Link href="/" className="text-sm text-accent hover:underline">← Back to home</Link>
@@ -84,9 +85,11 @@ export function Article({ id }: { id: string }) {
   const state = publishState(blog);
 
   return (
-    <article className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
-      <Link href="/" className="mb-8 inline-flex items-center gap-1 text-sm text-muted hover:text-fg">
-        ← All articles
+    <article ref={articleRef} className="relative mx-auto max-w-[42rem] px-5 py-10 sm:px-6">
+      <ReadingProgress targetRef={articleRef} />
+
+      <Link href="/" className="mb-8 inline-flex items-center gap-1.5 text-meta text-muted transition-colors hover:text-fg">
+        ← All writing
       </Link>
 
       {isOwner && state !== "live" && (
@@ -98,21 +101,26 @@ export function Article({ id }: { id: string }) {
       )}
 
       {blog.tags?.length > 0 && (
-        <div className="mb-4 flex flex-wrap gap-1.5">
-          {blog.tags.map((t) => (
-            <TagChip key={t} tag={t} href={`/?q=${encodeURIComponent(t)}`} />
+        <div className="label mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-accent">
+          {blog.tags.map((t, i) => (
+            <span key={t} className="flex items-center gap-2">
+              {i > 0 && <span className="text-faint" aria-hidden="true">/</span>}
+              <Link href={`/?q=${encodeURIComponent(t)}`} className="hover:underline">
+                {t}
+              </Link>
+            </span>
           ))}
         </div>
       )}
 
-      <h1 className="text-balance text-3xl font-bold leading-tight tracking-tight sm:text-4xl md:text-5xl">
+      <h1 className="text-balance font-display text-[2rem] font-semibold leading-[1.1] tracking-[-0.02em] sm:text-[2.6rem] md:text-[3rem]">
         {blog.title}
       </h1>
 
-      <div className="mt-6 flex flex-wrap items-center gap-3 text-sm text-muted">
+      <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-2 rule-bottom pb-5 text-meta text-muted">
         {blog.author ? (
           <Link href={`/author/${blog.author._id}`} className="flex items-center gap-2.5 hover:text-fg">
-            <Avatar name={blog.author.name} size={40} />
+            <Avatar name={blog.author.name} size={34} />
             <span className="font-medium text-fg">{blog.author.name}</span>
           </Link>
         ) : (
@@ -148,7 +156,7 @@ export function Article({ id }: { id: string }) {
       </div>
 
       {blog.titleBackgroundImageUrl && (
-        <div className="relative mt-8 aspect-[16/9] overflow-hidden rounded-2xl bg-subtle">
+        <div className="relative mt-8 aspect-[16/9] overflow-hidden rounded-md bg-subtle">
           <CoverImage src={blog.titleBackgroundImageUrl} title={blog.title} priority sizes="(max-width: 768px) 100vw, 768px" />
         </div>
       )}
@@ -157,16 +165,13 @@ export function Article({ id }: { id: string }) {
 
       <div
         ref={contentRef}
-        className="prose prose-stone dark:prose-invert prose-lg mt-10 max-w-none prose-a:text-accent prose-img:rounded-xl"
+        className="prose prose-stone dark:prose-invert mt-10 max-w-none text-[1.0625rem] leading-[1.75] prose-a:text-accent prose-a:underline prose-a:decoration-accent/30 prose-a:underline-offset-2 prose-img:rounded-md"
         dangerouslySetInnerHTML={{ __html: html }}
       />
 
-      <div className="mt-10 flex items-center gap-4 border-t border-border pt-6">
+      <div className="mt-12 flex items-center gap-3 rule-top pt-6">
         <LikeButton blogId={blog._id} initialLikes={blog.likes ?? []} />
         <BookmarkButton blogId={blog._id} initialBookmarked={blog.bookmarked ?? false} />
-        <span className="text-sm text-muted">
-          {blog.comments?.length ?? 0} comment{(blog.comments?.length ?? 0) === 1 ? "" : "s"}
-        </span>
       </div>
 
       <CommentSection blogId={blog._id} />
