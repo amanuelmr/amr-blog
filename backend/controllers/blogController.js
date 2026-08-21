@@ -274,6 +274,9 @@ exports.searchBlogs = async (req, res) => {
     // (prevents regex injection / ReDoS).
     const safeQuery = escapeRegex(query.trim());
     // $and, not a spread: publicFilter() already has its own top-level $or.
+    // Tags match whole-string (anchored) rather than as a substring: the tag
+    // chips on an article link here, and a chip must return the posts carrying
+    // that exact tag — not every post that happens to mention the word.
     const filter = {
       $and: [
         publicFilter(),
@@ -281,6 +284,7 @@ exports.searchBlogs = async (req, res) => {
           $or: [
             { title: { $regex: safeQuery, $options: "i" } },
             { content: { $regex: safeQuery, $options: "i" } },
+            { tags: { $regex: `^${safeQuery}$`, $options: "i" } },
           ],
         },
       ],
