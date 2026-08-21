@@ -341,10 +341,13 @@ exports.verifyEmail = async (req, res) => {
 
 exports.logout = async (req, res) => {
   try {
+    // $unset, not `$set: { refreshToken: undefined }` — Mongoose strips
+    // undefined values out of an update, which made that a silent no-op and
+    // left the refresh token usable for its full lifetime after logout.
     await User.findByIdAndUpdate(
       req.user._id,
       {
-        $set: { refreshToken: undefined },
+        $unset: { refreshToken: 1 },
       },
       { new: true }
     );

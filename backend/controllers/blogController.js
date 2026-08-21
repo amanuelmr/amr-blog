@@ -274,6 +274,9 @@ exports.searchBlogs = async (req, res) => {
     // (prevents regex injection / ReDoS).
     const safeQuery = escapeRegex(query.trim());
     // $and, not a spread: publicFilter() already has its own top-level $or.
+    // Tags match whole-string (anchored) rather than as a substring: the tag
+    // chips on an article link here, and a chip must return the posts carrying
+    // that exact tag — not every post that happens to mention the word.
     const filter = {
       $and: [
         publicFilter(),
@@ -281,6 +284,7 @@ exports.searchBlogs = async (req, res) => {
           $or: [
             { title: { $regex: safeQuery, $options: "i" } },
             { content: { $regex: safeQuery, $options: "i" } },
+            { tags: { $regex: `^${safeQuery}$`, $options: "i" } },
           ],
         },
       ],
@@ -595,7 +599,15 @@ exports.editComment = async (req, res) => {
 
     await blog.save();
 
-    res.json({ msg: "Comment updated successfully", comment });
+    // Populate before responding so every comment endpoint returns the same
+    // shape ({ user: { _id, name } }). Returning a bare author id here made
+    // the client lose the commenter's name when it merged the response.
+    await blog.populate({ path: "comments.user", select: "name" });
+
+    res.json({
+      msg: "Comment updated successfully",
+      comment: blog.comments.id(req.params.commentId),
+    });
   } catch (error) {
     console.error(error.message);
     res.status(500).send("Server error");

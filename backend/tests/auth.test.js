@@ -1,5 +1,6 @@
 const request = require('supertest');
 const app = require('../index');
+const User = require('../models/User');
 const { getLastOtp, registerAndVerify, registerVerifyLogin, defaultUser } = require('./helpers');
 
 describe('Auth flows', () => {
@@ -118,6 +119,23 @@ describe('Auth flows', () => {
         .post('/api/v1/auth/login')
         .send({ email: defaultUser.email, password: defaultUser.password })
         .expect(200);
+    });
+
+    it('invalidates the refresh token server-side on logout', async () => {
+      const agent = request.agent(app);
+      await registerVerifyLogin(agent);
+
+      const stolen = (await User.findOne({ email: defaultUser.email })).refreshToken;
+      expect(stolen).toBeTruthy();
+
+      await agent.post('/api/v1/auth/logout').send({}).expect(200);
+
+      // Cleared in the database, so a copy captured before logout is useless
+      expect((await User.findOne({ email: defaultUser.email })).refreshToken).toBeFalsy();
+      await request(app)
+        .post('/api/v1/auth/refresh-token')
+        .send({ refreshToken: stolen })
+        .expect(401);
     });
   });
 

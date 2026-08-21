@@ -88,6 +88,22 @@ app.use((err, req, res, _next) => {
         });
     }
 
+    // Errors that already carry a 4xx status are the client's fault, not the
+    // server's — body-parser raises these for malformed JSON (400) and an
+    // over-large body (413). Without this they were flattened into a 500,
+    // telling the caller the server broke when the request was at fault.
+    const clientStatus = err.status || err.statusCode;
+    if (clientStatus >= 400 && clientStatus < 500) {
+        const messages = {
+            'entity.parse.failed': 'Malformed JSON in request body',
+            'entity.too.large': 'Request body is too large',
+        };
+        return res.status(clientStatus).json({
+            success: false,
+            msg: messages[err.type] || 'Bad request'
+        });
+    }
+
     // Cloudinary or other file upload errors
     if (err.message && err.message.includes('Cloudinary')) {
         return res.status(500).json({

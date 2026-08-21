@@ -191,6 +191,10 @@ describe('Blog API', () => {
       expect(edited.body.comment.text).toBe('Edited comment');
       // createdAt preserved, editedAt set
       expect(edited.body.comment.editedAt).toBeDefined();
+      // Author stays populated, same shape as add/list, so the client keeps the
+      // commenter's name and their own edit/delete controls
+      expect(edited.body.comment.user).toEqual(added.body.comment.user);
+      expect(edited.body.comment.user.name).toBeDefined();
 
       await agent
         .delete(`/api/v1/blogs/${id}/comments/${commentId}`)
@@ -370,6 +374,26 @@ describe('Blog API', () => {
         .expect(200);
       expect(res.body.success).toBe(true);
       expect(res.body.total).toBe(1);
+    });
+
+    it('finds posts by tag, which is what the tag chips link to', async () => {
+      const agent = request.agent(app);
+      await registerVerifyLogin(agent);
+      // The tag never appears in the title or body, so only a tag match finds it
+      await createBlog(agent, {
+        title: 'Retries and backoff',
+        content: 'Notes on making a write safe to repeat.',
+        tags: 'distributed-systems,reliability',
+      }).expect(201);
+
+      const byTag = await request(app)
+        .get('/api/v1/blogs/search?query=distributed-systems')
+        .expect(200);
+      expect(byTag.body.total).toBe(1);
+
+      // Case-insensitive, but whole-tag: a partial must not match the tag
+      expect((await request(app).get('/api/v1/blogs/search?query=RELIABILITY')).body.total).toBe(1);
+      expect((await request(app).get('/api/v1/blogs/search?query=reliab')).body.total).toBe(0);
     });
   });
 });
