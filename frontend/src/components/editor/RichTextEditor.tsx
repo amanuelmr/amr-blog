@@ -7,6 +7,7 @@ import StarterKit from "@tiptap/starter-kit";
 import { Placeholder } from "@tiptap/extensions";
 import Image from "@tiptap/extension-image";
 import { uploadImage } from "@/lib/uploadImage";
+import { imageFileError } from "@/lib/imageFile";
 import { ApiError } from "@/lib/api";
 import {
   BoldIcon, ItalicIcon, CodeIcon, LinkIcon, H2Icon, H3Icon, QuoteIcon,
@@ -61,8 +62,9 @@ export function RichTextEditor({
   const insertImageFile = useCallback(async (file: File) => {
     const ed = editorRef.current;
     if (!ed) return;
-    if (!file.type.startsWith("image/")) {
-      setUploadError("That file isn’t an image.");
+    const invalid = imageFileError(file);
+    if (invalid) {
+      setUploadError(invalid);
       return;
     }
     setUploadError("");

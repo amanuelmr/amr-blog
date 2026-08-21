@@ -2,8 +2,7 @@
 
 import { useRef, useState, DragEvent } from "react";
 import { ImageIcon } from "./EditorIcons";
-
-const MAX_BYTES = 5 * 1024 * 1024; // matches backend 5MB limit
+import { imageFileError } from "@/lib/imageFile";
 
 export function CoverImageInput({
   preview,
@@ -21,12 +20,9 @@ export function CoverImageInput({
   function accept(file?: File | null) {
     setError("");
     if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      setError("Cover must be an image file.");
-      return;
-    }
-    if (file.size > MAX_BYTES) {
-      setError("Cover image must be 5MB or smaller.");
+    const invalid = imageFileError(file);
+    if (invalid) {
+      setError(invalid);
       return;
     }
     onSelect(file);
