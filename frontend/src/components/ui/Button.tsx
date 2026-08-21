@@ -5,7 +5,7 @@ type Variant = "primary" | "secondary" | "ghost";
 type Size = "sm" | "md";
 
 const base =
-  "inline-flex items-center justify-center gap-2 font-medium rounded-lg transition-colors disabled:opacity-50 disabled:pointer-events-none whitespace-nowrap";
+  "inline-flex items-center justify-center gap-2 font-medium rounded-md transition-colors disabled:opacity-50 disabled:pointer-events-none whitespace-nowrap";
 
 const variants: Record<Variant, string> = {
   primary: "bg-accent text-accent-fg hover:bg-accent-hover",
@@ -52,16 +52,19 @@ export function LinkButton({
   variant = "primary",
   size = "md",
   className = "",
+  onClick,
   children,
 }: {
   href: string;
   variant?: Variant;
   size?: Size;
   className?: string;
+  /** Useful for dismissing a menu as you navigate. */
+  onClick?: () => void;
   children: React.ReactNode;
 }) {
   return (
-    <Link href={href} className={buttonClasses(variant, size, className)}>
+    <Link href={href} className={buttonClasses(variant, size, className)} onClick={onClick}>
       {children}
     </Link>
   );
