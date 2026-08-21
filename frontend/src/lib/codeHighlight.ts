@@ -15,6 +15,24 @@ import yaml from "highlight.js/lib/languages/yaml";
 import markdown from "highlight.js/lib/languages/markdown";
 import plaintext from "highlight.js/lib/languages/plaintext";
 
+const LANGUAGE_LABELS: Record<string, string> = {
+  javascript: "JavaScript",
+  typescript: "TypeScript",
+  xml: "HTML",
+  css: "CSS",
+  json: "JSON",
+  bash: "Shell",
+  python: "Python",
+  go: "Go",
+  java: "Java",
+  csharp: "C#",
+  cpp: "C++",
+  sql: "SQL",
+  yaml: "YAML",
+  markdown: "Markdown",
+  plaintext: "Text",
+};
+
 let registered = false;
 
 function registerLanguages() {
@@ -63,6 +81,20 @@ export function enhanceCodeBlocks(root: HTMLElement): void {
 
     hljs.highlightElement(codeEl);
 
+    // hljs writes the detected language onto the element as `language-x`;
+    // surface it so a reader can tell TypeScript from Go at a glance.
+    const detected = Array.from(codeEl.classList)
+      .find((c) => c.startsWith("language-"))
+      ?.replace("language-", "");
+
+    const head = document.createElement("div");
+    head.className = "code-head";
+
+    const label = document.createElement("span");
+    label.className = "code-lang";
+    label.textContent = LANGUAGE_LABELS[detected ?? ""] ?? detected ?? "Code";
+    head.appendChild(label);
+
     const button = document.createElement("button");
     button.type = "button";
     button.className = "code-copy-btn";
@@ -70,12 +102,14 @@ export function enhanceCodeBlocks(root: HTMLElement): void {
     button.setAttribute("aria-label", "Copy code");
     button.addEventListener("click", () => {
       void copyToClipboard(codeEl.textContent || "").then((ok) => {
-        button.textContent = ok ? "Copied!" : "Couldn't copy";
+        button.textContent = ok ? "Copied" : "Couldn\u2019t copy";
         window.setTimeout(() => {
           button.textContent = "Copy";
         }, 1500);
       });
     });
-    pre.appendChild(button);
+    head.appendChild(button);
+
+    pre.insertBefore(head, codeEl);
   });
 }
