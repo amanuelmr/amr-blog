@@ -1,8 +1,12 @@
 import Link from "next/link";
 import { Blog } from "@/lib/types";
 import { CoverImage } from "./CoverImage";
-import { formatDate, readingTime, blogHref } from "@/lib/format";
+import { formatDate, readingTime, blogHref, excerpt } from "@/lib/format";
 
+/**
+ * One line of the index. `index` is the running position in the whole feed,
+ * not within the page, so the numbering reads as a continuous list.
+ */
 export function ArticleRow({ blog, index }: { blog: Blog; index: number }) {
   const href = blogHref(blog);
   const num = String(index + 1).padStart(2, "0");
@@ -11,33 +15,35 @@ export function ArticleRow({ blog, index }: { blog: Blog; index: number }) {
   return (
     <Link
       href={href}
-      className="group grid grid-cols-[2.5rem_1fr] items-start gap-4 border-t border-border py-7 sm:grid-cols-[3rem_1fr_auto] sm:gap-6"
+      className="group grid grid-cols-[2rem_1fr] items-baseline gap-x-4 gap-y-2 rule-top py-6 sm:grid-cols-[2.5rem_1fr_auto] sm:gap-x-6"
     >
-      <span className="pt-1 font-mono text-sm tabular-nums text-muted transition-colors group-hover:text-accent">
+      <span className="font-mono text-[0.6875rem] tabular-nums text-faint transition-colors group-hover:text-accent">
         {num}
       </span>
 
       <div className="min-w-0">
-        <h3 className="text-balance font-serif text-xl font-semibold leading-snug tracking-tight sm:text-2xl">
+        {blog.tags?.length > 0 && (
+          <p className="label mb-1.5 text-muted">{blog.tags.slice(0, 2).join(" · ")}</p>
+        )}
+
+        <h3 className="text-balance font-display text-[1.3rem] font-semibold leading-[1.25] tracking-[-0.015em] sm:text-[1.45rem]">
           <span className="transition-colors group-hover:text-accent">{blog.title}</span>
-          <span className="ml-1.5 inline-block text-accent opacity-0 transition-opacity group-hover:opacity-100">→</span>
         </h3>
-        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.1em] text-muted">
-          {blog.tags?.[0] && (
-            <>
-              <span>{blog.tags[0]}</span>
-              <span className="text-border">·</span>
-            </>
-          )}
-          <span className="tabular-nums normal-case">{formatDate(blog.createdAt)}</span>
-          <span className="text-border">·</span>
-          <span className="tabular-nums normal-case">{readingTime(blog.content)} min</span>
+
+        <p className="mt-1.5 line-clamp-2 max-w-measure text-[0.9375rem] leading-relaxed text-muted">
+          {excerpt(blog.content, 130)}
+        </p>
+
+        <div className="mt-2 flex items-center gap-2 text-[0.75rem] text-muted">
+          <span className="tabular-nums">{formatDate(blog.createdAt)}</span>
+          <span className="text-faint" aria-hidden="true">·</span>
+          <span className="tabular-nums">{readingTime(blog.content)} min</span>
         </div>
       </div>
 
       {hasCover && (
-        <div className="relative hidden h-16 w-24 flex-none overflow-hidden rounded-md bg-subtle sm:block">
-          <CoverImage src={blog.titleBackgroundImageUrl} title={blog.title} sizes="96px" />
+        <div className="relative hidden h-[4.5rem] w-28 flex-none overflow-hidden rounded bg-subtle sm:block">
+          <CoverImage src={blog.titleBackgroundImageUrl} title={blog.title} sizes="112px" />
         </div>
       )}
     </Link>

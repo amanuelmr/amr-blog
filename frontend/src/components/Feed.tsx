@@ -20,8 +20,8 @@ interface FeedResponse {
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <div className="mb-2 flex items-center gap-3">
-      <span className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">{children}</span>
-      <span className="h-px flex-1 bg-border" />
+      <span className="label text-muted">{children}</span>
+      <span className="h-px flex-1 bg-rule" />
     </div>
   );
 }
@@ -58,14 +58,16 @@ export function Feed({ q, page }: { q: string; page: number }) {
   const showHero = !q && page === 1;
   const blogs = data?.blogs ?? [];
   const listBlogs = showHero ? blogs.slice(1) : blogs;
+  // Continuous numbering: page 2 starts where page 1 left off.
+  const rowOffset = (page - 1) * PAGE_SIZE + (showHero ? 1 : 0);
 
   return (
-    <div className="mx-auto max-w-4xl px-5 py-12 sm:px-6 sm:py-16">
+    <div className="mx-auto max-w-3xl px-5 py-12 sm:px-6 sm:py-16">
       {/* Masthead */}
       {q ? (
-        <header className="mb-10">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">Search</p>
-          <h1 className="mt-3 font-serif text-3xl font-bold tracking-tight sm:text-4xl">
+        <header className="mb-10 rule-bottom pb-6">
+          <p className="label text-muted">Search</p>
+          <h1 className="mt-3 font-display text-[2rem] font-semibold tracking-[-0.02em] sm:text-[2.5rem]">
             “{q}”
           </h1>
           {data && (
@@ -77,13 +79,11 @@ export function Feed({ q, page }: { q: string; page: number }) {
       ) : (
         page === 1 && (
           <header className="mb-12">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">
-              AMR · Journal
-            </p>
-            <h1 className="mt-4 text-balance font-serif text-4xl font-bold leading-tight tracking-tight sm:text-5xl">
+            <p className="label text-accent">AMR · Journal</p>
+            <h1 className="mt-4 text-balance font-display text-[2.4rem] font-semibold leading-[1.05] tracking-[-0.025em] sm:text-[3.25rem]">
               Writing on building software.
             </h1>
-            <p className="mt-4 max-w-2xl text-lg leading-relaxed text-muted">
+            <p className="mt-4 max-w-measure text-[1.0625rem] leading-relaxed text-muted">
               Essays and field notes on backend, systems, and the craft of shipping things that last.
             </p>
           </header>
@@ -112,7 +112,7 @@ export function Feed({ q, page }: { q: string; page: number }) {
               <SectionLabel>{showHero ? "The Latest" : q ? "Results" : "More stories"}</SectionLabel>
               <div>
                 {listBlogs.map((b, i) => (
-                  <ArticleRow key={b._id} blog={b} index={i} />
+                  <ArticleRow key={b._id} blog={b} index={rowOffset + i} />
                 ))}
               </div>
             </section>
