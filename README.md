@@ -14,10 +14,13 @@ A full-stack blogging platform — a REST API and a modern reading/writing clien
 ## Features
 
 - **Auth** — register → email OTP verification → login, with password reset and change-password flows. Access/refresh JWTs are stored in **httpOnly cookies**; the API auto-refreshes on expiry.
-- **Rich-text authoring** — a Medium-style Tiptap editor (headings, lists, quotes, code, links, inline images via drag/drop/paste) with a distraction-free composer (full-width cover dropzone, borderless title, chip tags).
+- **Rich-text authoring** — a Medium-style Tiptap editor (headings, lists, quotes, code, links, inline images via drag/drop/paste) with a distraction-free composer (full-width cover dropzone, borderless title, chip tags); code blocks get syntax highlighting and a copy button on render.
+- **Publishing controls** — save a post as a **draft**, **schedule** it for a future date, or publish immediately; a "Your posts" dashboard lists every post you own regardless of status.
 - **Content safety** — article HTML is sanitized server-side (`xss` allowlist) before it is stored, and again with DOMPurify on render (defense-in-depth).
-- **Reading experience** — an editorial home feed (featured lead + numbered list), full article pages with **likes** and threaded **comments**, tag/topic filtering, and full-text **search** with pagination.
+- **Reading experience** — an editorial home feed (featured lead + numbered list), full article pages with an auto-generated **table of contents**, **view counts**, **likes**, a **reading list** (bookmarks), threaded **comments**, tag/topic filtering, and full-text **search** with pagination.
+- **Author profiles** — a public `/author/:id` page with a short bio and the author's published posts.
 - **SEO-friendly URLs** — posts resolve by human-readable **slug** (`/blog/the-quiet-architecture-9f3a1c`) with backward-compatible id lookups.
+- **Discovery** — an RSS feed (`/rss.xml`) and a sitemap (`/sitemap.xml`) for feed readers and search engines.
 - **Media** — cover and inline images upload to **Cloudinary**.
 - **Transactional email** — verification, password-reset, and welcome emails (table-based, inline-styled, responsive) via Nodemailer.
 - **Docs & tests** — OpenAPI/Swagger UI for the API; Jest + Supertest integration tests (in-memory MongoDB) and GitHub Actions CI.
@@ -83,6 +86,8 @@ npm run dev                  # http://localhost:3000
 | Variable | Required | Description |
 | --- | --- | --- |
 | `NEXT_PUBLIC_API_URL` | **yes** | Base URL of the backend API, including `/api/v1` |
+| `BACKEND_URL` | no | Backend origin the same-origin proxy forwards `/api/*` to; also what server-side code (sitemap, RSS) resolves against when `NEXT_PUBLIC_API_URL` is a relative path |
+| `NEXT_PUBLIC_SITE_URL` | no | Public site URL, used to build the absolute links in `sitemap.xml` and `rss.xml` |
 
 > **Port alignment:** `NEXT_PUBLIC_API_URL` must point at the port the backend is running on, e.g. `http://localhost:5000/api/v1` (or `5001` — just start the backend with `PORT=5001` to match). Because auth uses cookies, also set the backend `CORS_ORIGIN` to the frontend origin (`http://localhost:3000`).
 
@@ -103,8 +108,11 @@ The frontend footer's **API** link points here automatically (derived from `NEXT
 | Area | Endpoint |
 | --- | --- |
 | Auth | `POST /auth/register`, `/auth/verify-email`, `/auth/login`, `/auth/refresh-token`, `/auth/logout`, `/auth/forgot-password`, `/auth/reset-password`, `/auth/change-password` |
-| Blogs | `GET /blogs`, `GET /blogs/:slugOrId`, `GET /blogs/search`, `POST /blogs/create`, `PUT /blogs/:id`, `DELETE /blogs/:id`, `POST /blogs/upload-image` |
-| Engagement | `POST /blogs/:id/like`, `GET|POST /blogs/:id/comments`, `PUT|DELETE /blogs/:id/comments/:commentId` |
+| Profile | `GET /auth/users/:id` (public profile), `PUT /auth/me` (update your own name/bio) |
+| Blogs | `GET /blogs` (optional `?author=`), `GET /blogs/:slugOrId`, `GET /blogs/search`, `GET /blogs/mine`, `GET /blogs/bookmarks`, `POST /blogs/create`, `PUT /blogs/:id`, `DELETE /blogs/:id` |
+| Engagement | `POST /blogs/:id/like`, `POST /blogs/:id/bookmark`, `GET|POST /blogs/:id/comments`, `PUT|DELETE /blogs/:id/comments/:commentId` (replies via `parentComment`) |
+
+A post's `status` (`draft`/`published`) and `publishedAt` control visibility — see the `Blog` schema in Swagger for details. A published post with a future `publishedAt` is scheduled and stays hidden until then; only its author can see a draft or a not-yet-due scheduled post.
 
 ---
 
@@ -115,7 +123,7 @@ cd backend
 npm test          # Jest + Supertest against an in-memory MongoDB
 ```
 
-Coverage includes the auth lifecycle, blog CRUD & authorization, comments/likes, slug resolution, and HTML sanitization. CI runs lint + tests on every push/PR (`.github/workflows/ci.yml`).
+Coverage includes the auth lifecycle, profile updates, blog CRUD & authorization, draft/scheduled visibility, threaded comments, likes, bookmarks, slug resolution, and HTML sanitization. CI runs lint + tests on every push/PR (`.github/workflows/ci.yml`).
 
 ## Scripts
 
@@ -129,17 +137,18 @@ amr-blog/
 ├── backend/
 │   ├── config/         # db, cloudinary, env validation
 │   ├── controllers/    # auth, blog
-│   ├── middlewares/    # auth, validation, rate limiting
+│   ├── middlewares/    # auth (required/optional), validation, rate limiting
 │   ├── models/         # User, Blog
 │   ├── routes/         # /auth, /blogs
-│   ├── utils/          # tokens, OTP, slugify, sanitize, email templates
+│   ├── utils/          # tokens, OTP, slugify, sanitize, blog visibility, email templates
 │   └── tests/          # Jest + Supertest
 └── frontend/
     └── src/
-        ├── app/          # App Router pages (home, blog/[id], write, auth)
-        ├── components/   # editor, feed, article, UI primitives
+        ├── app/          # App Router pages (home, blog/[id], write, write/mine,
+        │                 # bookmarks, author/[id], auth, rss.xml, sitemap.ts)
+        ├── components/   # editor, feed, article, comments, profile, UI primitives
         ├── context/      # AuthContext
-        └── lib/          # api client, types, formatting
+        └── lib/          # api client, types, formatting, code highlighting, TOC
 ```
 
 ## License
