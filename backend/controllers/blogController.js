@@ -599,7 +599,15 @@ exports.editComment = async (req, res) => {
 
     await blog.save();
 
-    res.json({ msg: "Comment updated successfully", comment });
+    // Populate before responding so every comment endpoint returns the same
+    // shape ({ user: { _id, name } }). Returning a bare author id here made
+    // the client lose the commenter's name when it merged the response.
+    await blog.populate({ path: "comments.user", select: "name" });
+
+    res.json({
+      msg: "Comment updated successfully",
+      comment: blog.comments.id(req.params.commentId),
+    });
   } catch (error) {
     console.error(error.message);
     res.status(500).send("Server error");

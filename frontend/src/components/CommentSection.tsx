@@ -113,7 +113,12 @@ export function CommentSection({ blogId }: { blogId: string }) {
         method: "PUT",
         body: { text: editText.trim() },
       });
-      setComments((cs) => cs.map((c) => (c._id === id ? { ...c, ...res.comment } : c)));
+      // Keep the author we already have rather than trusting the response to
+      // carry a populated one — losing it would blank the name and make the
+      // comment stop looking like yours.
+      setComments((cs) =>
+        cs.map((c) => (c._id === id ? { ...c, ...res.comment, user: c.user } : c))
+      );
       setEditingId(null);
     } catch {
       /* keep editing on failure */

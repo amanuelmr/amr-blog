@@ -191,6 +191,10 @@ describe('Blog API', () => {
       expect(edited.body.comment.text).toBe('Edited comment');
       // createdAt preserved, editedAt set
       expect(edited.body.comment.editedAt).toBeDefined();
+      // Author stays populated, same shape as add/list, so the client keeps the
+      // commenter's name and their own edit/delete controls
+      expect(edited.body.comment.user).toEqual(added.body.comment.user);
+      expect(edited.body.comment.user.name).toBeDefined();
 
       await agent
         .delete(`/api/v1/blogs/${id}/comments/${commentId}`)
