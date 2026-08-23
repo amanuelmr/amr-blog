@@ -2,52 +2,63 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Design tokens — clean, content-first. Warm-neutral stone + a teal accent.
-   Values are space-separated RGB channels so Tailwind's <alpha-value> works. */
-:root {
-  --bg: 255 255 255;
-  --surface: 250 250 249;      /* stone-50 */
-  --card: 255 255 255;
-  --subtle: 245 245 244;       /* stone-100 */
-  --border: 231 229 228;       /* stone-200 */
-  --fg: 28 25 23;              /* stone-900 */
-  --muted: 120 113 108;        /* stone-500 */
-  --accent: 13 148 136;        /* teal-600 */
-  --accent-hover: 15 118 110;  /* teal-700 */
-  --accent-fg: 255 255 255;
+/* ---------------------------------------------------------------------------
+   Design tokens — paper and ink.
 
-  /* Code block syntax highlighting */
-  --code-bg: 250 250 249;      /* stone-50 */
-  --code-fg: 41 37 36;         /* stone-800 */
-  --code-comment: 120 113 108; /* stone-500 */
-  --code-keyword: 29 78 216;   /* blue-700 */
-  --code-string: 13 148 136;   /* teal-600, ties to the accent */
-  --code-number: 180 83 9;     /* amber-700 */
-  --code-title: 147 51 234;    /* purple-600 */
-  --code-attr: 2 132 199;      /* sky-600 */
+   The palette is a warm press stock rather than white, with a single oxblood
+   accent used for links, rules and active states. Everything structural is
+   carried by type, rules and space; colour is not asked to do that work.
+   Values are space-separated RGB channels so Tailwind's <alpha-value> works.
+   --------------------------------------------------------------------------- */
+:root {
+  --bg: 247 245 240;           /* paper */
+  --surface: 242 239 232;      /* recessed paper */
+  --card: 252 250 246;
+  --subtle: 237 233 224;
+  --border: 220 213 200;
+  --rule: 201 192 174;         /* editorial hairline, stronger than a border */
+  --fg: 26 23 20;              /* ink */
+  --muted: 110 103 92;
+  --faint: 118 110 96;         /* tertiary text — still clears AA on paper */
+  --accent: 163 46 42;         /* oxblood */
+  --accent-hover: 133 35 31;
+  --accent-fg: 255 255 255;
+  --accent-soft: 241 227 223;
+
+  /* Code: a calm print-ink set that does not compete with the oxblood accent */
+  --code-bg: 242 239 232;
+  --code-fg: 42 38 34;
+  --code-comment: 106 99 87;
+  --code-keyword: 31 86 115;   /* petrol */
+  --code-string: 64 105 62;    /* moss */
+  --code-number: 138 90 27;    /* ochre */
+  --code-title: 107 75 154;    /* aubergine */
+  --code-attr: 31 110 122;
 }
 
 .dark {
-  --bg: 12 10 9;               /* stone-950 */
-  --surface: 23 20 19;
-  --card: 28 25 23;            /* stone-900 */
-  --subtle: 41 37 36;          /* stone-800 */
-  --border: 51 47 45;
-  --fg: 245 245 244;           /* stone-100 */
-  --muted: 168 162 158;        /* stone-400 */
-  --accent: 45 212 191;        /* teal-400 */
-  --accent-hover: 20 184 166;  /* teal-500 */
-  --accent-fg: 12 10 9;
+  --bg: 18 16 13;
+  --surface: 26 23 19;
+  --card: 32 28 23;
+  --subtle: 40 35 32;
+  --border: 53 48 42;
+  --rule: 68 62 54;
+  --fg: 239 234 225;
+  --muted: 167 158 144;
+  --faint: 142 133 119;
+  --accent: 224 128 118;       /* the oxblood, lifted for a dark ground */
+  --accent-hover: 236 150 141;
+  --accent-fg: 26 21 18;
+  --accent-soft: 46 33 30;
 
-  /* Code block syntax highlighting */
-  --code-bg: 23 20 19;
-  --code-fg: 231 229 228;      /* stone-200 */
-  --code-comment: 168 162 158; /* stone-400 */
-  --code-keyword: 96 165 250;  /* blue-400 */
-  --code-string: 45 212 191;   /* teal-400, ties to the accent */
-  --code-number: 251 191 36;   /* amber-400 */
-  --code-title: 192 132 252;   /* purple-400 */
-  --code-attr: 56 189 248;     /* sky-400 */
+  --code-bg: 26 23 19;
+  --code-fg: 227 220 209;
+  --code-comment: 142 133 119;
+  --code-keyword: 127 182 212;
+  --code-string: 156 199 150;
+  --code-number: 220 169 95;
+  --code-title: 183 155 224;
+  --code-attr: 127 198 206;
 }
 
 * {
@@ -56,6 +67,8 @@
 
 html {
   scroll-behavior: smooth;
+  /* Anchored headings clear the sticky header instead of hiding under it. */
+  scroll-padding-top: 5.5rem;
 }
 
 body {
@@ -70,22 +83,64 @@ body {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
 
-/* Long-form article body: serif, comfortable measure */
 @layer utilities {
   .text-balance { text-wrap: balance; }
+  .text-pretty { text-wrap: pretty; }
+
+  /* Uppercase editorial label — topics, section eyebrows, kickers. */
+  .label {
+    font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  /* A heavier rule for section breaks; --border stays for boxes. */
+  .rule-top { border-top: 1px solid rgb(var(--rule)); }
+  .rule-bottom { border-bottom: 1px solid rgb(var(--rule)); }
 }
 
-/* Tighten prose rhythm (applies to the editor and the article).
-   @tailwindcss/typography uses :where() (0 specificity), so these plain
-   `.prose x` rules win and give denser paragraph/list spacing. */
+/* Keyboard-only escape hatch to the article. */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 100;
+}
+.skip-link:focus {
+  left: 0.75rem;
+  top: 0.75rem;
+  padding: 0.5rem 0.9rem;
+  border-radius: 0.5rem;
+  background: rgb(var(--fg));
+  color: rgb(var(--bg));
+  font-size: 0.875rem;
+}
+
+/* Reading progress — a hairline, not a loading bar. */
+.reading-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 2px;
+  background: rgb(var(--accent));
+  z-index: 50;
+  transition: width 0.1s linear;
+}
+
+/* ---------------------------------------------------------------------------
+   Prose rhythm. @tailwindcss/typography uses :where() (0 specificity), so
+   these plain rules win and give a denser, more editorial paragraph rhythm.
+   --------------------------------------------------------------------------- */
 .prose p {
-  margin-top: 0.7em;
-  margin-bottom: 0.7em;
+  margin-top: 0.75em;
+  margin-bottom: 0.75em;
 }
 .prose ul,
 .prose ol {
-  margin-top: 0.7em;
-  margin-bottom: 0.7em;
+  margin-top: 0.75em;
+  margin-bottom: 0.75em;
   padding-left: 1.4em;
 }
 .prose li {
@@ -99,15 +154,21 @@ body {
 .prose h1,
 .prose h2,
 .prose h3 {
-  margin-top: 1.1em;
-  margin-bottom: 0.45em;
+  margin-top: 1.6em;
+  margin-bottom: 0.5em;
 }
 .prose blockquote {
-  margin-top: 0.9em;
-  margin-bottom: 0.9em;
+  margin-top: 1.1em;
+  margin-bottom: 1.1em;
 }
 .prose > :first-child {
   margin-top: 0;
+}
+/* Figure captions read as captions, not as body copy. */
+.prose figcaption {
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.8125rem;
+  color: rgb(var(--muted));
 }
 
 /* Tiptap editor: focus + placeholder */
@@ -132,45 +193,86 @@ body {
   border-radius: 3px;
 }
 
-/* Article code blocks: highlight.js tokens + a copy button (see
-   lib/codeHighlight.ts, which attaches the `code-block`/`code-copy-btn`
-   classes at render time). */
+/* ---------------------------------------------------------------------------
+   Code blocks. A technical publication treats code as an interface: the
+   language is labelled, the copy control is always discoverable by keyboard,
+   and long lines scroll inside the block rather than widening the page.
+   --------------------------------------------------------------------------- */
 .prose pre.code-block {
   position: relative;
   overflow-x: auto;
-  border-radius: 0.75rem;
+  border-radius: 0.5rem;
   border: 1px solid rgb(var(--border));
   background-color: rgb(var(--code-bg));
+  padding-top: 2.25rem;   /* room for the label / copy row */
 }
 .prose pre.code-block code.hljs {
   display: block;
-  padding: 1rem 3rem 1rem 1.1rem;
+  padding: 0.35rem 1.1rem 1rem;
   background: transparent;
   color: rgb(var(--code-fg));
-  font-size: 0.85em;
-  line-height: 1.65;
+  font-size: 0.8125em;
+  line-height: 1.7;
+}
+/* Label + copy sit on a hairline shelf at the top of the block. */
+.code-head {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.45rem 0.6rem 0.45rem 1.1rem;
+  border-bottom: 1px solid rgb(var(--border));
+  background: rgb(var(--code-bg));
+}
+.code-lang {
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgb(var(--muted));
 }
 .code-copy-btn {
-  position: absolute;
-  top: 0.6rem;
-  right: 0.6rem;
-  border-radius: 0.375rem;
-  border: 1px solid rgb(var(--border));
-  background-color: rgb(var(--card));
-  padding: 0.25rem 0.6rem;
-  font-size: 0.75rem;
-  font-weight: 500;
+  flex: none;
+  border-radius: 0.3rem;
+  border: 1px solid transparent;
+  background: transparent;
+  padding: 0.2rem 0.5rem;
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   color: rgb(var(--muted));
-  opacity: 0;
-  transition: opacity 0.15s, color 0.15s, border-color 0.15s;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background-color 0.15s;
 }
 .code-copy-btn:hover {
   color: rgb(var(--fg));
-  border-color: rgb(var(--muted));
+  border-color: rgb(var(--border));
+  background: rgb(var(--card));
 }
-pre.code-block:hover .code-copy-btn,
-.code-copy-btn:focus-visible {
-  opacity: 1;
+
+/* Table of contents: the active section is marked by a rule and weight, not
+   colour alone. */
+.toc-link {
+  display: block;
+  border-left: 2px solid transparent;
+  padding: 0.25rem 0 0.25rem 0.75rem;
+  color: rgb(var(--muted));
+  transition: color 0.15s, border-color 0.15s;
+}
+.toc-link:hover {
+  color: rgb(var(--fg));
+}
+.toc-link[aria-current="true"] {
+  border-left-color: rgb(var(--accent));
+  color: rgb(var(--fg));
+  font-weight: 600;
 }
 
 .hljs-comment,
@@ -209,7 +311,7 @@ pre.code-block:hover .code-copy-btn,
   color: rgb(var(--code-attr));
 }
 .hljs-deletion {
-  color: rgb(220 38 38);
+  color: rgb(185 40 40);
 }
 .hljs-emphasis {
   font-style: italic;
