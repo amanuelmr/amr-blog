@@ -12,12 +12,12 @@ export function FeaturedLead({ blog }: { blog: Blog }) {
     <article className="group border-t-2 border-fg pt-7">
       <div className={hasCover ? "grid items-center gap-8 md:grid-cols-2 md:gap-12" : ""}>
         <div>
-          <div className="label mb-4 flex items-center gap-2">
-            <span className="text-accent">Featured</span>
+          <div className="mb-4 flex items-center gap-2">
+            <span className="label text-accent">Featured</span>
             {blog.tags?.[0] && (
               <>
                 <span className="text-faint" aria-hidden="true">/</span>
-                <span className="text-muted">{blog.tags[0]}</span>
+                <span className="font-mono text-[0.75rem] lowercase text-muted">{blog.tags[0]}</span>
               </>
             )}
           </div>
@@ -32,7 +32,7 @@ export function FeaturedLead({ blog }: { blog: Blog }) {
             {excerpt(blog.content, 200)}
           </p>
 
-          <div className="mt-5 flex flex-wrap items-center gap-2.5 text-meta text-muted">
+          <div className="mt-5 flex flex-wrap items-center gap-2.5 font-mono text-[0.6875rem] tabular-nums text-muted">
             {blog.author ? (
               <Link href={`/author/${blog.author._id}`} className="flex items-center gap-2.5 hover:text-fg">
                 <Avatar name={blog.author.name} size={30} />

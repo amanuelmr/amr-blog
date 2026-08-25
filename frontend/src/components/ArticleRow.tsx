@@ -23,7 +23,9 @@ export function ArticleRow({ blog, index }: { blog: Blog; index: number }) {
 
       <div className="min-w-0">
         {blog.tags?.length > 0 && (
-          <p className="label mb-1.5 text-muted">{blog.tags.slice(0, 2).join(" · ")}</p>
+          <p className="mb-1.5 font-mono text-[0.75rem] lowercase tracking-tight text-muted">
+            {blog.tags.slice(0, 2).join(" / ")}
+          </p>
         )}
 
         <h3 className="text-balance font-display text-[1.3rem] font-semibold leading-[1.25] tracking-[-0.015em] sm:text-[1.45rem]">
@@ -34,10 +36,10 @@ export function ArticleRow({ blog, index }: { blog: Blog; index: number }) {
           {excerpt(blog.content, 130)}
         </p>
 
-        <div className="mt-2 flex items-center gap-2 text-[0.75rem] text-muted">
-          <span className="tabular-nums">{formatDate(blog.createdAt)}</span>
+        <div className="mt-2 flex items-center gap-2 font-mono text-[0.6875rem] tabular-nums text-muted">
+          <span>{formatDate(blog.createdAt)}</span>
           <span className="text-faint" aria-hidden="true">·</span>
-          <span className="tabular-nums">{readingTime(blog.content)} min</span>
+          <span>{readingTime(blog.content)} min read</span>
         </div>
       </div>
 
