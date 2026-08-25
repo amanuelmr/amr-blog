@@ -7,8 +7,6 @@ import { api, ApiError } from "@/lib/api";
 import { Blog, PublicProfile } from "@/lib/types";
 import { Avatar } from "./Avatar";
 import { ArticleRow } from "./ArticleRow";
-import { Button } from "./ui/Button";
-import { Textarea } from "./ui/Field";
 import { Spinner, EmptyState, ErrorState } from "./states";
 import { Pagination } from "./Pagination";
 import { formatDate } from "@/lib/format";
@@ -23,15 +21,11 @@ interface PostsResponse {
 }
 
 export function AuthorProfile({ id, page }: { id: string; page: number }) {
-  const { user, updateProfile } = useAuth();
+  const { user } = useAuth();
   const [profile, setProfile] = useState<PublicProfile | null>(null);
   const [posts, setPosts] = useState<PostsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [editing, setEditing] = useState(false);
-  const [bioDraft, setBioDraft] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -56,26 +50,6 @@ export function AuthorProfile({ id, page }: { id: string; page: number }) {
 
   const isOwnProfile = !!user && user._id === id;
 
-  function startEditBio() {
-    setBioDraft(profile?.bio ?? "");
-    setSaveError("");
-    setEditing(true);
-  }
-
-  async function saveBio() {
-    setSaving(true);
-    setSaveError("");
-    try {
-      const updated = await updateProfile({ bio: bioDraft.trim() });
-      setProfile((p) => (p ? { ...p, bio: updated.bio } : p));
-      setEditing(false);
-    } catch (err) {
-      setSaveError(err instanceof ApiError ? err.message : "Could not save your bio.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
   if (loading) return <div className="mx-auto max-w-3xl px-4 py-10"><Spinner label="Loading profile…" /></div>;
   if (error || !profile)
     return (
@@ -92,39 +66,15 @@ export function AuthorProfile({ id, page }: { id: string; page: number }) {
           <h1 className="font-serif text-2xl font-bold tracking-tight">{profile.name}</h1>
           <p className="mt-0.5 text-sm text-muted">Joined {formatDate(profile.createdAt)}</p>
 
-          {editing ? (
-            <div className="mt-3">
-              <Textarea
-                value={bioDraft}
-                onChange={(e) => setBioDraft(e.target.value)}
-                rows={3}
-                maxLength={280}
-                placeholder="Tell readers a bit about yourself…"
-                aria-label="Bio"
-              />
-              {saveError && <p className="mt-1.5 text-sm text-red-500">{saveError}</p>}
-              <div className="mt-2 flex justify-end gap-2">
-                <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>
-                  Cancel
-                </Button>
-                <Button size="sm" onClick={saveBio} loading={saving}>
-                  Save
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <>
-              {profile.bio ? (
-                <p className="mt-3 max-w-prose text-fg/90">{profile.bio}</p>
-              ) : isOwnProfile ? (
-                <p className="mt-3 text-sm text-muted">No bio yet.</p>
-              ) : null}
-              {isOwnProfile && (
-                <button onClick={startEditBio} className="mt-2 text-sm text-accent hover:underline">
-                  {profile.bio ? "Edit bio" : "Add a bio"}
-                </button>
-              )}
-            </>
+          {profile.bio ? (
+            <p className="mt-3 max-w-prose text-fg/90">{profile.bio}</p>
+          ) : isOwnProfile ? (
+            <p className="mt-3 text-sm text-muted">No bio yet.</p>
+          ) : null}
+          {isOwnProfile && (
+            <Link href="/settings" className="mt-2 inline-block text-sm text-accent hover:underline">
+              {profile.bio ? "Edit profile" : "Add a bio"}
+            </Link>
           )}
         </div>
       </div>
