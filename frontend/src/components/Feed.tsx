@@ -6,6 +6,7 @@ import { api, ApiError } from "@/lib/api";
 import { FeaturedLead } from "./FeaturedLead";
 import { ArticleRow } from "./ArticleRow";
 import { Pagination } from "./Pagination";
+import { SideRail } from "./SideRail";
 import { Spinner, EmptyState, ErrorState } from "./states";
 
 const PAGE_SIZE = 9;
@@ -62,7 +63,7 @@ export function Feed({ q, page }: { q: string; page: number }) {
   const rowOffset = (page - 1) * PAGE_SIZE + (showHero ? 1 : 0);
 
   return (
-    <div className="mx-auto max-w-3xl px-5 py-12 sm:px-6 sm:py-16">
+    <div className="mx-auto max-w-6xl px-5 py-12 sm:px-6 sm:py-16">
       {/* Masthead */}
       {q ? (
         <header className="mb-10 rule-bottom pb-6">
@@ -90,6 +91,8 @@ export function Feed({ q, page }: { q: string; page: number }) {
         )
       )}
 
+      <div className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_16rem] lg:gap-14">
+        <div className="min-w-0">
       {loading ? (
         <Spinner label="Loading articles…" />
       ) : error ? (
@@ -121,6 +124,13 @@ export function Feed({ q, page }: { q: string; page: number }) {
           {data && <Pagination page={data.page} totalPages={data.totalPages} makeHref={makeHref} />}
         </>
       )}
+        </div>
+
+        {/* Secondary column: what people read, and what this journal covers. */}
+        <div className="lg:sticky lg:top-24 lg:self-start">
+          <SideRail />
+        </div>
+      </div>
     </div>
   );
 }
