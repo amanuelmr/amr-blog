@@ -104,10 +104,14 @@ export function Header() {
               <LinkButton href="/write" size="sm" className="hidden sm:inline-flex">
                 Write
               </LinkButton>
-              <span className="hidden items-center gap-2 md:flex">
+              <Link
+                href="/settings"
+                title="Account settings"
+                className="hidden items-center gap-2 rounded-md px-1.5 py-1 transition-colors hover:bg-subtle md:flex"
+              >
                 <Avatar name={user.name} size={30} />
                 <span className="max-w-[8rem] truncate text-sm text-fg">{user.name}</span>
-              </span>
+              </Link>
               <Button variant="ghost" size="sm" className="hidden sm:inline-flex" onClick={() => logout()}>
                 Log out
               </Button>
@@ -181,6 +185,9 @@ export function Header() {
                 </Link>
                 <Link href={`/author/${user._id}`} onClick={close} className="rule-top py-3 text-[0.95rem] text-fg">
                   Your profile
+                </Link>
+                <Link href="/settings" onClick={close} className="rule-top py-3 text-[0.95rem] text-fg">
+                  Settings
                 </Link>
                 <div className="rule-top flex items-center justify-between gap-3 py-3">
                   <span className="flex min-w-0 items-center gap-2.5">

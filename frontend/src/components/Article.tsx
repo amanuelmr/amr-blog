@@ -11,6 +11,7 @@ import { Avatar } from "./Avatar";
 import { LikeButton } from "./LikeButton";
 import { BookmarkButton } from "./BookmarkButton";
 import { CommentSection } from "./CommentSection";
+import { ContinueReading } from "./ContinueReading";
 import { TableOfContents } from "./TableOfContents";
 import { ReadingProgress } from "./ReadingProgress";
 import { Spinner, ErrorState } from "./states";
@@ -173,6 +174,8 @@ export function Article({ id }: { id: string }) {
         <LikeButton blogId={blog._id} initialLikes={blog.likes ?? []} />
         <BookmarkButton blogId={blog._id} initialBookmarked={blog.bookmarked ?? false} />
       </div>
+
+      <ContinueReading blog={blog} />
 
       <CommentSection blogId={blog._id} />
     </article>
