@@ -1,9 +1,9 @@
-const nodemailer = require('nodemailer');
+const { __sentMail } = require('resend');
 
 // Extract the plaintext 6-digit OTP from the most recently "sent" email.
 // Markup-agnostic: matches the standalone 6-digit code wherever it appears.
 const getLastOtp = () => {
-  const last = nodemailer.__sentMail.at(-1);
+  const last = __sentMail.at(-1);
   if (!last) return null;
   const match = last.html.match(/\b(\d{6})\b/);
   return match ? match[1] : null;

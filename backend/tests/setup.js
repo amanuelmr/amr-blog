@@ -14,8 +14,8 @@ afterEach(async () => {
     await collections[key].deleteMany({});
   }
   // Reset captured emails between tests
-  const nodemailer = require('nodemailer');
-  if (nodemailer.__sentMail) nodemailer.__sentMail.length = 0;
+  const { __sentMail } = require('resend');
+  if (__sentMail) __sentMail.length = 0;
 });
 
 afterAll(async () => {

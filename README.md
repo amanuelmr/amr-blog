@@ -22,13 +22,13 @@ A full-stack blogging platform — a REST API and a modern reading/writing clien
 - **SEO-friendly URLs** — posts resolve by human-readable **slug** (`/blog/the-quiet-architecture-9f3a1c`) with backward-compatible id lookups.
 - **Discovery** — an RSS feed (`/rss.xml`) and a sitemap (`/sitemap.xml`) for feed readers and search engines.
 - **Media** — cover and inline images upload to **Cloudinary**.
-- **Transactional email** — verification, password-reset, and welcome emails (table-based, inline-styled, responsive) via Nodemailer.
+- **Transactional email** — verification, password-reset, and welcome emails (table-based, inline-styled, responsive) via Resend.
 - **Docs & tests** — OpenAPI/Swagger UI for the API; Jest + Supertest integration tests (in-memory MongoDB) and GitHub Actions CI.
 - **Theming** — light/dark, responsive, accessible.
 
 ## Tech stack
 
-**Backend:** Express, Mongoose, JSON Web Tokens, bcryptjs, `xss`, Cloudinary + Multer, Nodemailer, Helmet, CORS, express-rate-limit, Zod validation, Swagger (swagger-jsdoc/ui-express), Jest + Supertest + mongodb-memory-server.
+**Backend:** Express, Mongoose, JSON Web Tokens, bcryptjs, `xss`, Cloudinary + Multer, Resend, Helmet, CORS, express-rate-limit, Zod validation, Swagger (swagger-jsdoc/ui-express), Jest + Supertest + mongodb-memory-server.
 
 **Frontend:** Next.js App Router, React, TypeScript, Tailwind CSS (+ Typography), Tiptap (ProseMirror), isomorphic-dompurify, Geist fonts.
 
@@ -41,7 +41,7 @@ A full-stack blogging platform — a REST API and a modern reading/writing clien
 - **Node.js ≥ 18**
 - A **MongoDB** connection string (local or Atlas)
 - A **Cloudinary** account (image uploads)
-- SMTP credentials for email (the defaults assume Gmail; an app password is recommended)
+- A **Resend** account with a verified sending domain (transactional email)
 
 ### 1. Backend
 
@@ -63,8 +63,8 @@ The server **fails fast** if required environment variables are missing or the d
 | `MONGODB_URI` | **yes** | MongoDB connection string |
 | `ACCESS_TOKEN_SECRET` | **yes** | Secret for signing access tokens (long, random) |
 | `REFRESH_TOKEN_SECRET` | **yes** | Secret for signing refresh tokens (long, random) |
-| `EMAIL` | **yes** | SMTP username / from-address |
-| `PASSWORD` | **yes** | SMTP password / app password |
+| `RESEND_API_KEY` | **yes** | Resend API key ([resend.com/api-keys](https://resend.com/api-keys)) |
+| `MAIL_FROM` | no | From-address, must be on a domain verified in Resend (default `AMR Blog <noreply@mail.amanuel.work>`) |
 | `CLOUDINARY_CLOUD_NAME` | **yes** | Cloudinary cloud name |
 | `CLOUDINARY_API_KEY` | **yes** | Cloudinary API key |
 | `CLOUDINARY_API_SECRET` | **yes** | Cloudinary API secret |

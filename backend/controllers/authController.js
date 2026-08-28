@@ -1,7 +1,6 @@
 const mongoose = require("mongoose");
 const User = require("../models/User");
 const jwt = require("jsonwebtoken");
-const nodemailer = require("nodemailer");
 require("dotenv").config();
 
 const {
@@ -17,17 +16,7 @@ const {
 } = require("../utils/otpUtils");
 
 const { getEmailTemplate } = require("../utils/emailTemplates");
-
-const emailerTransporter = nodemailer.createTransport({
-  service: "gmail",
-  host: "smtp.gmail.com",
-  port: 587,
-  secure: false,
-  auth: {
-    user: process.env.EMAIL,
-    pass: process.env.PASSWORD, 
-  },
-});
+const { sendEmail, getMailerStatus } = require("../utils/mailer");
 
 exports.register = async (req, res) => {
   // Input is validated by the `validate(registerSchema)` route middleware.
@@ -60,19 +49,12 @@ exports.register = async (req, res) => {
 
     // Send verification email with the plaintext OTP
     try {
-      const emailTemplate = getEmailTemplate('emailVerification', {
+      const verificationEmail = getEmailTemplate('emailVerification', {
         name: user.name,
         otp: verificationOTP
       });
 
-      const mailOptions = {
-        from: process.env.EMAIL,
-        to: user.email,
-        subject: "Verify Your Email - AMR Blog",
-        html: emailTemplate,
-      };
-
-      await emailerTransporter.sendMail(mailOptions);
+      await sendEmail({ to: user.email, ...verificationEmail });
     } catch (emailError) {
       console.error("Email sending failed:", emailError);
       return res.status(500).json({
@@ -296,20 +278,13 @@ exports.verifyEmail = async (req, res) => {
 
     // Send welcome email
     try {
-      const welcomeTemplate = getEmailTemplate('welcome', {
+      const welcomeEmail = getEmailTemplate('welcome', {
         name: user.name,
         loginUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/login`
       });
 
-      const mailOptions = {
-        from: process.env.EMAIL,
-        to: user.email,
-        subject: "Welcome to AMR Blog! 🎉",
-        html: welcomeTemplate,
-      };
-
       // Send welcome email (don't wait for it to complete)
-      emailerTransporter.sendMail(mailOptions).catch(console.error);
+      sendEmail({ to: user.email, ...welcomeEmail }).catch(console.error);
     } catch (emailError) {
       console.error("Failed to send welcome email:", emailError);
       // Don't fail the verification if welcome email fails
@@ -433,20 +408,13 @@ exports.forgotPassword = async (req, res) => {
     const userIp = req.ip || req.connection.remoteAddress || req.socket.remoteAddress;
 
     // Send password reset email with the plaintext OTP
-    const emailTemplate = getEmailTemplate('passwordReset', {
+    const resetEmail = getEmailTemplate('passwordReset', {
       name: user.name,
       otp: passwordResetOTP,
       ip: userIp
     });
 
-    const mailOptions = {
-      from: process.env.EMAIL,
-      to: user.email,
-      subject: "Reset Your Password - AMR Blog",
-      html: emailTemplate,
-    };
-
-    await emailerTransporter.sendMail(mailOptions);
+    await sendEmail({ to: user.email, ...resetEmail });
 
     return res.status(200).json({ msg: "Password reset code sent to your email" });
 
@@ -489,19 +457,12 @@ exports.resetPassword = async (req, res) => {
     await user.save();
 
     // Send password changed confirmation email
-    const passwordChangedTemplate = getEmailTemplate('passwordChanged', {
+    const passwordChangedEmail = getEmailTemplate('passwordChanged', {
       name: user.name
     });
 
-    const mailOptions = {
-      from: process.env.EMAIL,
-      to: user.email,
-      subject: "Password Changed Successfully - AMR Blog",
-      html: passwordChangedTemplate,
-    };
-
     // Send confirmation email (don't wait for it to complete)
-    emailerTransporter.sendMail(mailOptions).catch(console.error);
+    sendEmail({ to: user.email, ...passwordChangedEmail }).catch(console.error);
 
     return res.status(200).json({ msg: 'Password reset successfully' });
 
@@ -538,19 +499,12 @@ exports.resendVerificationOTP = async (req, res) => {
     await user.save();
 
     // Send verification email with the plaintext OTP
-    const emailTemplate = getEmailTemplate('emailVerification', {
+    const verificationEmail = getEmailTemplate('emailVerification', {
       name: user.name,
       otp: verificationOTP
     });
 
-    const mailOptions = {
-      from: process.env.EMAIL,
-      to: user.email,
-      subject: "Verify Your Email - AMR Blog",
-      html: emailTemplate,
-    };
-
-    await emailerTransporter.sendMail(mailOptions);
+    await sendEmail({ to: user.email, ...verificationEmail });
 
     return res.status(200).json({ msg: 'New verification code sent to your email' });
   } catch (error) {
@@ -569,8 +523,8 @@ exports.debugSystemHealth = async (req, res) => {
         JWT_SECRET: !!process.env.JWT_SECRET,
         ACCESS_TOKEN_SECRET: !!process.env.ACCESS_TOKEN_SECRET,
         REFRESH_TOKEN_SECRET: !!process.env.REFRESH_TOKEN_SECRET,
-        EMAIL: !!process.env.EMAIL,
-        PASSWORD: !!process.env.PASSWORD,
+        RESEND_API_KEY: !!process.env.RESEND_API_KEY,
+        MAIL_FROM: !!process.env.MAIL_FROM,
         MONGODB_URI: !!process.env.MONGODB_URI,
       },
       database: 'checking...',
@@ -585,13 +539,12 @@ exports.debugSystemHealth = async (req, res) => {
       healthCheck.database = `error: ${dbError.message}`;
     }
 
-    // Test email configuration
-    try {
-      await emailerTransporter.verify();
-      healthCheck.emailService = 'configured';
-    } catch (emailError) {
-      healthCheck.emailService = `error: ${emailError.message}`;
-    }
+    // Test email configuration. Resend is stateless HTTP, so this reports
+    // whether sending is configured rather than probing a connection.
+    const mailer = getMailerStatus();
+    healthCheck.emailService = mailer.configured
+      ? 'configured'
+      : 'error: RESEND_API_KEY is not set';
 
     return res.status(200).json({
       success: true,
@@ -637,19 +590,12 @@ exports.changePassword = async (req, res) => {
 
     // Send password changed confirmation email
     try {
-      const passwordChangedTemplate = getEmailTemplate('passwordChanged', {
+      const passwordChangedEmail = getEmailTemplate('passwordChanged', {
         name: user.name
       });
 
-      const mailOptions = {
-        from: process.env.EMAIL,
-        to: user.email,
-        subject: "Password Changed Successfully - AMR Blog",
-        html: passwordChangedTemplate,
-      };
-
       // Send confirmation email (don't wait for it to complete)
-      emailerTransporter.sendMail(mailOptions).catch(console.error);
+      sendEmail({ to: user.email, ...passwordChangedEmail }).catch(console.error);
     } catch (emailError) {
       console.error("Failed to send password change confirmation:", emailError);
     }
