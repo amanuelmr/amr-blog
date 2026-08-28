@@ -31,7 +31,7 @@
     "morgan": "^1.11.0",
     "multer": "^2.0.1",
     "multer-storage-cloudinary": "^4.0.0",
-    "nodemailer": "^6.9.15",
+    "resend": "^6.24.0",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^4.1.2",
     "xss": "^1.0.15",

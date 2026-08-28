@@ -1,3 +1,7 @@
 /node_modules
 .env
 *.local
+
+# Temporary local E2E bootstrap, not part of the app
+e2e-bootstrap.js
+.e2e-mail.json
