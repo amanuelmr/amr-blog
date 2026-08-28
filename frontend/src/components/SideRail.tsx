@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { Blog } from "@/lib/types";
 import { blogHref, formatDate } from "@/lib/format";
+import { InlineError, Skeleton } from "@/components/states";
 
 interface FeedResponse {
   blogs: Blog[];
@@ -13,6 +14,28 @@ interface FeedResponse {
 const MOST_READ = 5;
 const MAX_TOPICS = 10;
 
+type Status = "loading" | "error" | "success";
+
+function RailSkeleton() {
+  return (
+    <div className="flex flex-col gap-10" aria-hidden="true">
+      {[MOST_READ, 6].map((rows, section) => (
+        <div key={section}>
+          <Skeleton className="h-[0.6875rem] w-20" />
+          <ul className="mt-4 flex flex-col">
+            {Array.from({ length: section === 0 ? 3 : 5 }).map((_, i) => (
+              <li key={i} className="rule-top py-3.5 first:border-t-0">
+                <Skeleton className="h-3.5 w-full max-w-[14rem]" />
+                <Skeleton className="mt-2 h-2.5 w-16" />
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /**
  * The secondary column: what people actually read, and what the journal
  * actually covers. Both are derived from one feed request rather than new
@@ -20,23 +43,37 @@ const MAX_TOPICS = 10;
  * would be decoration, not information.
  */
 export function SideRail({ currentId }: { currentId?: string }) {
-  const [blogs, setBlogs] = useState<Blog[] | null>(null);
+  const [blogs, setBlogs] = useState<Blog[]>([]);
+  const [status, setStatus] = useState<Status>("loading");
 
-  useEffect(() => {
+  const load = useCallback(() => {
     let cancelled = false;
+    setStatus("loading");
     api<FeedResponse>("/blogs?limit=50")
       .then((res) => {
-        if (!cancelled) setBlogs(res.blogs ?? []);
+        if (cancelled) return;
+        setBlogs(res.blogs ?? []);
+        setStatus("success");
       })
       .catch(() => {
-        if (!cancelled) setBlogs([]);
+        if (!cancelled) setStatus("error");
       });
     return () => {
       cancelled = true;
     };
   }, []);
 
-  if (!blogs || blogs.length === 0) return null;
+  useEffect(() => load(), [load]);
+
+  if (status === "loading") return <RailSkeleton />;
+  if (status === "error") {
+    return (
+      <div className="text-muted">
+        <InlineError message="Couldn't load the rail." onRetry={load} />
+      </div>
+    );
+  }
+  if (blogs.length === 0) return null;
 
   const mostRead = [...blogs]
     .filter((b) => b._id !== currentId)
