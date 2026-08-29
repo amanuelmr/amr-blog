@@ -3,12 +3,8 @@
 import { useEffect, useState } from "react";
 import { Heading } from "@/lib/toc";
 
-/**
- * Two presentations of one list. On wide screens it sits in the margin beside
- * the article and tracks the section you are reading; on narrow screens it
- * collapses into a disclosure so it never pushes the article down the page.
- */
-export function TableOfContents({ headings }: { headings: Heading[] }) {
+/** Tracks which heading the reading line has most recently passed. */
+function useActiveHeading(headings: Heading[]): string {
   const [activeId, setActiveId] = useState<string>("");
 
   useEffect(() => {
@@ -40,9 +36,11 @@ export function TableOfContents({ headings }: { headings: Heading[] }) {
     };
   }, [headings]);
 
-  if (headings.length < 2) return null;
+  return activeId;
+}
 
-  const list = (
+function TocList({ headings, activeId }: { headings: Heading[]; activeId: string }) {
+  return (
     <ol className="flex flex-col text-[0.8125rem]">
       {headings.map((h, i) => (
         <li key={h.id} className={h.level === 3 ? "pl-3" : undefined}>
@@ -60,34 +58,48 @@ export function TableOfContents({ headings }: { headings: Heading[] }) {
       ))}
     </ol>
   );
+}
+
+/**
+ * Collapsed disclosure for narrow screens, placed inline in the article flow
+ * so it never pushes content down when open.
+ */
+export function TableOfContentsMobile({ headings }: { headings: Heading[] }) {
+  const activeId = useActiveHeading(headings);
+  if (headings.length < 2) return null;
 
   return (
-    <>
-      {/* Mobile / tablet: collapsed by default */}
-      <details className="group mt-8 rule-top rule-bottom py-3 lg:hidden">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
-          <span className="label text-muted">On this page</span>
-          <span className="text-muted transition-transform group-open:rotate-180" aria-hidden="true">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="m6 9 6 6 6-6" />
-            </svg>
-          </span>
-        </summary>
-        <nav aria-label="Table of contents" className="mt-3">
-          {list}
-        </nav>
-      </details>
-
-      {/* Desktop: pinned in the margin */}
-      <nav
-        aria-label="Table of contents"
-        className="pointer-events-none absolute left-full top-0 hidden h-full w-56 pl-10 lg:block"
-      >
-        <div className="pointer-events-auto sticky top-24">
-          <p className="label mb-3 text-faint">On this page</p>
-          {list}
-        </div>
+    <details className="group mt-8 rule-top rule-bottom py-3 lg:hidden">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
+        <span className="label text-muted">On this page</span>
+        <span className="text-muted transition-transform group-open:rotate-180" aria-hidden="true">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+        </span>
+      </summary>
+      <nav aria-label="Table of contents" className="mt-3">
+        <TocList headings={headings} activeId={activeId} />
       </nav>
-    </>
+    </details>
+  );
+}
+
+/**
+ * The wide-screen presentation: a genuine third grid column (not a floated
+ * overlay), so it reserves its own space instead of guessing how much margin
+ * is free next to the article.
+ */
+export function TableOfContentsDesktop({ headings }: { headings: Heading[] }) {
+  const activeId = useActiveHeading(headings);
+  if (headings.length < 2) return null;
+
+  return (
+    <nav aria-label="Table of contents" className="hidden lg:block">
+      <div className="sticky top-24">
+        <p className="label mb-3 text-faint">On this page</p>
+        <TocList headings={headings} activeId={activeId} />
+      </div>
+    </nav>
   );
 }
