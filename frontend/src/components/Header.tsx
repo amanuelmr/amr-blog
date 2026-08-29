@@ -7,6 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import { ThemeToggle } from "./ThemeToggle";
 import { Avatar } from "./Avatar";
 import { LinkButton, Button } from "./ui/Button";
+import { SearchPalette } from "./SearchPalette";
 
 function SearchIcon({ className }: { className?: string }) {
   return (
@@ -84,8 +85,15 @@ export function Header() {
               onChange={(e) => setQ(e.target.value)}
               placeholder="Search writing…"
               aria-label="Search writing"
-              className="w-full rounded-md border border-border bg-card py-1.5 pl-9 pr-3 text-sm text-fg placeholder:text-muted focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25"
+              className="w-full rounded-md border border-border bg-card py-1.5 pl-9 pr-11 text-sm text-fg placeholder:text-muted focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25"
             />
+            <kbd
+              aria-hidden="true"
+              title="Press ⌘K (Ctrl+K) for instant search"
+              className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 rounded border border-border bg-subtle px-1.5 py-0.5 font-mono text-[0.6875rem] text-faint"
+            >
+              ⌘K
+            </kbd>
           </div>
         </form>
 
@@ -222,6 +230,8 @@ export function Header() {
           </nav>
         </div>
       )}
+
+      <SearchPalette />
     </header>
   );
 }
