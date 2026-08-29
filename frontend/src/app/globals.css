@@ -11,23 +11,23 @@
    Values are space-separated RGB channels so Tailwind's <alpha-value> works.
    --------------------------------------------------------------------------- */
 :root {
-  --bg: 247 245 240;           /* paper */
-  --surface: 242 239 232;      /* recessed paper */
-  --card: 252 250 246;
-  --subtle: 237 233 224;
-  --border: 220 213 200;
-  --rule: 201 192 174;         /* editorial hairline, stronger than a border */
-  --fg: 26 23 20;              /* ink */
-  --muted: 110 103 92;
-  --faint: 118 110 96;         /* tertiary text — still clears AA on paper */
-  --accent: 163 46 42;         /* oxblood */
-  --accent-hover: 133 35 31;
+  --bg: 247 246 242;           /* paper */
+  --surface: 242 240 234;      /* recessed paper */
+  --card: 252 251 248;
+  --subtle: 239 238 233;
+  --border: 220 217 209;
+  --rule: 201 193 176;         /* editorial hairline, stronger than a border */
+  --fg: 23 23 23;              /* ink */
+  --muted: 105 103 97;
+  --faint: 113 110 101;        /* tertiary text — still clears AA on paper */
+  --accent: 180 74 50;         /* oxblood */
+  --accent-hover: 150 63 39;
   --accent-fg: 255 255 255;
-  --accent-soft: 241 227 223;
+  --accent-soft: 241 228 224;
 
   /* Code: a calm print-ink set that does not compete with the oxblood accent */
-  --code-bg: 242 239 232;
-  --code-fg: 42 38 34;
+  --code-bg: 242 240 234;
+  --code-fg: 39 38 37;
   --code-comment: 106 99 87;
   --code-keyword: 31 86 115;   /* petrol */
   --code-string: 64 105 62;    /* moss */
@@ -37,22 +37,22 @@
 }
 
 .dark {
-  --bg: 18 16 13;
-  --surface: 26 23 19;
-  --card: 32 28 23;
-  --subtle: 40 35 32;
-  --border: 53 48 42;
-  --rule: 68 62 54;
-  --fg: 239 234 225;
-  --muted: 167 158 144;
-  --faint: 142 133 119;
-  --accent: 224 128 118;       /* the oxblood, lifted for a dark ground */
-  --accent-hover: 236 150 141;
-  --accent-fg: 26 21 18;
-  --accent-soft: 46 33 30;
+  --bg: 17 17 15;
+  --surface: 25 24 21;
+  --card: 31 29 25;
+  --subtle: 39 36 34;
+  --border: 43 42 38;
+  --rule: 58 56 50;
+  --fg: 232 230 223;
+  --muted: 146 144 136;
+  --faint: 135 129 117;
+  --accent: 200 102 75;        /* the oxblood, lifted for a dark ground */
+  --accent-hover: 212 124 98;
+  --accent-fg: 255 255 255;
+  --accent-soft: 45 34 32;
 
-  --code-bg: 26 23 19;
-  --code-fg: 227 220 209;
+  --code-bg: 25 24 21;
+  --code-fg: 220 216 207;
   --code-comment: 142 133 119;
   --code-keyword: 127 182 212;
   --code-string: 156 199 150;
