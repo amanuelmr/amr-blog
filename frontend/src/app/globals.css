@@ -275,14 +275,14 @@ body {
   font-weight: 600;
 }
 
-/* Desktop TOC: a continuous rail with one sliding marker replaces the
-   per-item border above — the marker is drawn by the parent, so each link
-   here carries no border of its own, just matching padding. Repeated with
-   [aria-current="true"] to outrank the equally-specific rule above it. */
+/* Desktop TOC: a curved connector (drawn by the parent, in an SVG) replaces
+   the per-item border above, so each link here carries no border of its
+   own, just matching padding. Repeated with [aria-current="true"] to
+   outrank the equally-specific rule above it. */
 .toc-link--rail,
 .toc-link--rail[aria-current="true"] {
   border-left-color: transparent;
-  padding-left: 1rem;
+  padding-left: 1.5rem;
 }
 
 .hljs-comment,

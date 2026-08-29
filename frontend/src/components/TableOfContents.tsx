@@ -41,10 +41,7 @@ function useActiveHeading(headings: Heading[]): string {
 
 // Left position of the connector at each heading depth — h3 sits further
 // right, matching the `pl-3` indent already on its <li>.
-const DEPTH_X = { 2: 4, 3: 16 } as const;
-// Half-length, in pixels, of the S-curve that eases the connector sideways
-// when depth changes between one heading and the next.
-const CURVE = 6;
+const DEPTH_X = { 2: 4, 3: 20 } as const;
 
 interface Geometry {
   pathD: string;
@@ -73,18 +70,23 @@ function computeGeometry(
   if (rects.some((r) => !r)) return null;
   const bounds = rects as { top: number; bottom: number }[];
 
+  // Every transition curves through the real gap between two rows (the
+  // <ol>'s `gap-3`), so there's always genuine room for the S to read
+  // clearly — not a wobble squeezed out of the rows' own padding.
   let d = "";
   for (let i = 0; i < headings.length; i++) {
     const x = DEPTH_X[headings[i].level];
     if (i === 0) d += `M ${x} ${bounds[i].top} `;
+    d += `L ${x} ${bounds[i].bottom} `;
     const isLast = i === headings.length - 1;
-    const nextX = isLast ? x : DEPTH_X[headings[i + 1].level];
-    if (isLast || nextX === x) {
-      d += `L ${x} ${bounds[i].bottom} `;
+    if (isLast) continue;
+    const nextX = DEPTH_X[headings[i + 1].level];
+    const nextTop = bounds[i + 1].top;
+    if (nextX === x) {
+      d += `L ${nextX} ${nextTop} `;
     } else {
-      const boundary = bounds[i].bottom;
-      d += `L ${x} ${boundary - CURVE} `;
-      d += `C ${x} ${boundary - CURVE / 2} ${nextX} ${boundary + CURVE / 2} ${nextX} ${boundary + CURVE} `;
+      const midY = (bounds[i].bottom + nextTop) / 2;
+      d += `C ${x} ${midY} ${nextX} ${midY} ${nextX} ${nextTop} `;
     }
   }
 
@@ -154,24 +156,36 @@ function TocList({
   }, [animated, activeIndex, headings]);
 
   return (
-    <ol className={animated ? "relative flex flex-col text-[0.8125rem]" : "flex flex-col text-[0.8125rem]"}>
+    <ol
+      className={
+        animated
+          ? "relative flex flex-col gap-3 text-[0.8125rem]"
+          : "flex flex-col text-[0.8125rem]"
+      }
+    >
       {animated && geometry && (
         <>
           <svg
             aria-hidden="true"
             className="absolute left-0 top-0 overflow-visible transition-[clip-path] duration-300 ease-out"
-            width={20}
+            width={28}
             height={geometry.totalHeight}
             style={{
               clipPath: `inset(${geometry.clipTop}px 0 ${geometry.totalHeight - geometry.clipBottom}px 0)`,
             }}
           >
-            <path d={geometry.pathD} stroke="rgb(var(--accent))" strokeWidth={1.5} fill="none" />
+            <path
+              d={geometry.pathD}
+              stroke="rgb(var(--accent))"
+              strokeWidth={2}
+              strokeLinecap="round"
+              fill="none"
+            />
           </svg>
           <span
             aria-hidden="true"
-            className="absolute h-[6px] w-[6px] rounded-full bg-accent transition-[top,left] duration-300 ease-out"
-            style={{ top: geometry.dot.y - 3, left: geometry.dot.x - 3 }}
+            className="absolute h-2 w-2 rounded-full bg-accent ring-2 ring-bg transition-[top,left] duration-300 ease-out"
+            style={{ top: geometry.dot.y - 4, left: geometry.dot.x - 4 }}
           />
         </>
       )}
