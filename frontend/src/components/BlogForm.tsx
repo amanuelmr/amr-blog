@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
-import { Blog, BlogStatus } from "@/lib/types";
+import { Blog, BlogStatus, PostType } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
 import { FormAlert } from "@/components/AuthCard";
 import { RichTextEditor } from "@/components/editor/RichTextEditor";
@@ -27,6 +27,7 @@ export function BlogForm({ mode, blog }: { mode: "create" | "edit"; blog?: Blog 
   // Editor works in HTML; legacy plain-text posts are normalized on load.
   const [content, setContent] = useState(blog ? contentToHtml(blog.content) : "");
   const [tags, setTags] = useState<string[]>(blog?.tags ?? []);
+  const [postType, setPostType] = useState<PostType>(blog?.postType ?? "essay");
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(blog?.titleBackgroundImageUrl ?? null);
   const [error, setError] = useState("");
@@ -104,6 +105,7 @@ export function BlogForm({ mode, blog }: { mode: "create" | "edit"; blog?: Blog 
             title: title.trim(),
             content,
             tags,
+            postType,
             titleBackgroundImageUrl: coverUrl,
             ...statusPayload(),
           },
@@ -133,6 +135,15 @@ export function BlogForm({ mode, blog }: { mode: "create" | "edit"; blog?: Blog 
             ← Back
           </button>
           <div className="flex items-center gap-2">
+            <select
+              value={postType}
+              onChange={(e) => setPostType(e.target.value as PostType)}
+              aria-label="Post type"
+              className="rounded-lg border border-border bg-card px-2.5 py-1.5 text-sm text-fg focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
+            >
+              <option value="essay">Essay</option>
+              <option value="field-note">Field note</option>
+            </select>
             <select
               value={action}
               onChange={(e) => setAction(e.target.value as Action)}

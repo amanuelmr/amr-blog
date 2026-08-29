@@ -46,6 +46,7 @@ exports.createBlog = async (req, res) => {
       author: req.user.id,
       status,
       publishedAt,
+      postType: req.body.postType === "field-note" ? "field-note" : "essay",
     });
 
     // Stable, unique, human-readable URL slug derived from the title.
@@ -192,7 +193,10 @@ exports.editBlog = async (req, res) => {
     if (tags) {
       blog.tags = Array.isArray(tags) ? tags : tags.split(',').map(tag => tag.trim());
     }
-    
+    if (req.body.postType !== undefined) {
+      blog.postType = req.body.postType === "field-note" ? "field-note" : "essay";
+    }
+
     // Cover URL: update when provided (a string sets it, null/"" clears it).
     if (req.body.titleBackgroundImageUrl !== undefined) {
       blog.titleBackgroundImageUrl = req.body.titleBackgroundImageUrl || null;

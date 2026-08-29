@@ -14,6 +14,12 @@ export function FeaturedLead({ blog }: { blog: Blog }) {
         <div>
           <div className="mb-4 flex items-center gap-2">
             <span className="label text-accent">Featured</span>
+            {blog.postType === "field-note" && (
+              <>
+                <span className="text-faint" aria-hidden="true">/</span>
+                <span className="label text-muted">Field note</span>
+              </>
+            )}
             {blog.tags?.[0] && (
               <>
                 <span className="text-faint" aria-hidden="true">/</span>

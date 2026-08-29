@@ -101,9 +101,15 @@ export function Article({ id }: { id: string }) {
         </div>
       )}
 
-      {blog.tags?.length > 0 && (
+      {(blog.postType === "field-note" || blog.tags?.length > 0) && (
         <div className="label mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-accent">
-          {blog.tags.map((t, i) => (
+          {blog.postType === "field-note" && (
+            <span className="flex items-center gap-2">
+              Field note
+              {blog.tags?.length > 0 && <span className="text-faint" aria-hidden="true">/</span>}
+            </span>
+          )}
+          {blog.tags?.map((t, i) => (
             <span key={t} className="flex items-center gap-2">
               {i > 0 && <span className="text-faint" aria-hidden="true">/</span>}
               <Link href={`/?q=${encodeURIComponent(t)}`} className="hover:underline">

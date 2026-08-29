@@ -22,9 +22,15 @@ export function ArticleRow({ blog, index }: { blog: Blog; index: number }) {
       </span>
 
       <div className="min-w-0">
-        {blog.tags?.length > 0 && (
-          <p className="mb-1.5 font-mono text-[0.75rem] lowercase tracking-tight text-muted">
-            {blog.tags.slice(0, 2).join(" / ")}
+        {(blog.postType === "field-note" || blog.tags?.length > 0) && (
+          <p className="mb-1.5 flex items-center gap-2 font-mono text-[0.75rem] lowercase tracking-tight text-muted">
+            {blog.postType === "field-note" && (
+              <span className="label text-accent">Field note</span>
+            )}
+            {blog.postType === "field-note" && blog.tags?.length > 0 && (
+              <span className="text-faint" aria-hidden="true">/</span>
+            )}
+            {blog.tags?.length > 0 && blog.tags.slice(0, 2).join(" / ")}
           </p>
         )}
 
