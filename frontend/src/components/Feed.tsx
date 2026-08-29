@@ -7,7 +7,7 @@ import { FeaturedLead } from "./FeaturedLead";
 import { ArticleRow } from "./ArticleRow";
 import { Pagination } from "./Pagination";
 import { SideRail } from "./SideRail";
-import { Spinner, EmptyState, ErrorState } from "./states";
+import { EmptyState, ErrorState, Skeleton } from "./states";
 
 const PAGE_SIZE = 9;
 
@@ -23,6 +23,28 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
     <div className="mb-2 flex items-center gap-3">
       <span className="label text-muted">{children}</span>
       <span className="h-px flex-1 bg-rule" />
+    </div>
+  );
+}
+
+/** Mirrors the row list's shape so the page doesn't jump once real rows arrive. */
+function FeedSkeleton() {
+  return (
+    <div aria-hidden="true">
+      <SectionLabel>Latest writing</SectionLabel>
+      <div>
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="grid grid-cols-[2rem_1fr] gap-x-4 gap-y-2 border-t border-rule py-6 sm:grid-cols-[2.5rem_1fr_auto] sm:gap-x-6">
+            <Skeleton className="h-3 w-5" />
+            <div className="min-w-0">
+              <Skeleton className="h-5 w-full max-w-md" />
+              <Skeleton className="mt-2.5 h-3.5 w-full max-w-lg" />
+              <Skeleton className="mt-1.5 h-3.5 w-2/3 max-w-sm" />
+              <Skeleton className="mt-3 h-2.5 w-24" />
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -105,7 +127,7 @@ export function Feed({ q, page }: { q: string; page: number }) {
       <div className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_16rem] lg:gap-14">
         <div className="min-w-0">
       {loading ? (
-        <Spinner label="Loading articles…" />
+        <FeedSkeleton />
       ) : error ? (
         <ErrorState message={error} onRetry={fetchData} />
       ) : blogs.length === 0 ? (
