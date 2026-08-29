@@ -178,7 +178,19 @@ export function Article({ id }: { id: string }) {
           dangerouslySetInnerHTML={{ __html: html }}
         />
 
-        <div className="mt-12 flex items-center gap-3 rule-top pt-6">
+        <div className="mt-12 rule-top pt-8 text-center">
+          <p className="label text-faint">
+            {blog.postType === "field-note" ? "End of note" : "End of essay"}
+          </p>
+          <p className="mx-auto mt-3 max-w-measure text-[0.9375rem] leading-relaxed text-muted">
+            Thanks for reading. If this was useful, you can find more writing in the journal.
+          </p>
+          <Link href="/" className="mt-3 inline-flex items-center gap-1.5 text-sm text-accent hover:underline">
+            ← All writing
+          </Link>
+        </div>
+
+        <div className="mt-8 flex items-center justify-center gap-3">
           <LikeButton blogId={blog._id} initialLikes={blog.likes ?? []} />
           <BookmarkButton blogId={blog._id} initialBookmarked={blog.bookmarked ?? false} />
         </div>
