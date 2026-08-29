@@ -275,6 +275,16 @@ body {
   font-weight: 600;
 }
 
+/* Desktop TOC: a continuous rail with one sliding marker replaces the
+   per-item border above — the marker is drawn by the parent, so each link
+   here carries no border of its own, just matching padding. Repeated with
+   [aria-current="true"] to outrank the equally-specific rule above it. */
+.toc-link--rail,
+.toc-link--rail[aria-current="true"] {
+  border-left-color: transparent;
+  padding-left: 1rem;
+}
+
 .hljs-comment,
 .hljs-quote {
   color: rgb(var(--code-comment));

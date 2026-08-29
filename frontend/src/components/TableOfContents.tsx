@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Heading } from "@/lib/toc";
 
 /** Tracks which heading the reading line has most recently passed. */
@@ -39,15 +39,65 @@ function useActiveHeading(headings: Heading[]): string {
   return activeId;
 }
 
-function TocList({ headings, activeId }: { headings: Heading[]; activeId: string }) {
+/**
+ * `animated` swaps the old per-item static border for one continuous rail
+ * with a single marker that slides to the active heading's position — a
+ * timeline, not a row of borders switching on and off.
+ */
+function TocList({
+  headings,
+  activeId,
+  animated,
+}: {
+  headings: Heading[];
+  activeId: string;
+  animated?: boolean;
+}) {
+  const itemRefs = useRef(new Map<string, HTMLLIElement>());
+  const [marker, setMarker] = useState<{ top: number; height: number } | null>(null);
+
+  useLayoutEffect(() => {
+    if (!animated) return;
+    const measure = () => {
+      const el = activeId ? itemRefs.current.get(activeId) : null;
+      setMarker(el ? { top: el.offsetTop, height: el.offsetHeight } : null);
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [animated, activeId, headings]);
+
   return (
-    <ol className="flex flex-col text-[0.8125rem]">
+    <ol className={animated ? "relative flex flex-col text-[0.8125rem]" : "flex flex-col text-[0.8125rem]"}>
+      {animated && (
+        <>
+          <span aria-hidden="true" className="absolute left-0 top-0 bottom-0 w-px bg-rule" />
+          {marker && (
+            <span
+              aria-hidden="true"
+              className="absolute left-0 w-[3px] rounded-full bg-accent transition-[top,height] duration-300 ease-out"
+              style={{ top: marker.top, height: marker.height }}
+            />
+          )}
+        </>
+      )}
       {headings.map((h, i) => (
-        <li key={h.id} className={h.level === 3 ? "pl-3" : undefined}>
+        <li
+          key={h.id}
+          ref={
+            animated
+              ? (el) => {
+                  if (el) itemRefs.current.set(h.id, el);
+                  else itemRefs.current.delete(h.id);
+                }
+              : undefined
+          }
+          className={h.level === 3 ? "pl-3" : undefined}
+        >
           <a
             href={`#${h.id}`}
             aria-current={activeId === h.id ? "true" : undefined}
-            className="toc-link"
+            className={animated ? "toc-link toc-link--rail" : "toc-link"}
           >
             <span className="mr-2 font-mono text-[0.6875rem] tabular-nums text-faint">
               {String(i + 1).padStart(2, "0")}
@@ -98,7 +148,7 @@ export function TableOfContentsDesktop({ headings }: { headings: Heading[] }) {
     <nav aria-label="Table of contents" className="hidden lg:block">
       <div className="sticky top-24">
         <p className="label mb-3 text-faint">On this page</p>
-        <TocList headings={headings} activeId={activeId} />
+        <TocList headings={headings} activeId={activeId} animated />
       </div>
     </nav>
   );
