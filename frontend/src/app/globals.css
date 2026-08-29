@@ -89,7 +89,7 @@ body {
 
   /* Uppercase editorial label — topics, section eyebrows, kickers. */
   .label {
-    font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+    font-family: var(--font-mono), ui-monospace, monospace;
     font-size: 0.6875rem;
     font-weight: 600;
     letter-spacing: 0.14em;
@@ -166,7 +166,7 @@ body {
 }
 /* Figure captions read as captions, not as body copy. */
 .prose figcaption {
-  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-mono), ui-monospace, monospace;
   font-size: 0.8125rem;
   color: rgb(var(--muted));
 }
@@ -229,7 +229,7 @@ body {
   background: rgb(var(--code-bg));
 }
 .code-lang {
-  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-mono), ui-monospace, monospace;
   font-size: 0.6875rem;
   font-weight: 600;
   letter-spacing: 0.12em;
@@ -242,7 +242,7 @@ body {
   border: 1px solid transparent;
   background: transparent;
   padding: 0.2rem 0.5rem;
-  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-mono), ui-monospace, monospace;
   font-size: 0.6875rem;
   font-weight: 600;
   letter-spacing: 0.06em;

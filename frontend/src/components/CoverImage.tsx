@@ -29,7 +29,7 @@ export function CoverImage({
       className="relative flex h-full w-full items-center justify-center overflow-hidden bg-subtle"
       aria-hidden="true"
     >
-      <span className="select-none font-serif text-6xl font-bold text-fg/[0.08]">
+      <span className="select-none font-display text-6xl font-bold text-fg/[0.08]">
         {title.trim()[0]?.toUpperCase() ?? "A"}
       </span>
       <span className="absolute inset-0 bg-gradient-to-br from-fg/[0.015] to-transparent" />

@@ -61,7 +61,7 @@ function MyPostsInner({ page }: { page: number }) {
   return (
     <div className="mx-auto max-w-3xl px-5 py-12 sm:px-6">
       <div className="mb-8 flex items-center justify-between gap-4">
-        <h1 className="font-serif text-3xl font-bold tracking-tight">Your posts</h1>
+        <h1 className="font-display text-3xl font-bold tracking-tight">Your posts</h1>
         <LinkButton href="/write" size="sm">New post</LinkButton>
       </div>
 

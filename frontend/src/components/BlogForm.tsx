@@ -176,7 +176,7 @@ export function BlogForm({ mode, blog }: { mode: "create" | "edit"; blog?: Blog 
           maxLength={300}
           aria-label="Title"
           placeholder="Title"
-          className="mb-4 w-full resize-none overflow-hidden border-0 bg-transparent p-0 font-serif text-4xl font-bold leading-tight tracking-tight text-fg placeholder:text-muted/40 focus:outline-none focus:ring-0 sm:text-5xl"
+          className="mb-4 w-full resize-none overflow-hidden border-0 bg-transparent p-0 font-display text-4xl font-bold leading-tight tracking-tight text-fg placeholder:text-muted/40 focus:outline-none focus:ring-0 sm:text-5xl"
         />
 
         <RichTextEditor value={content} onChange={setContent} />
