@@ -80,6 +80,17 @@ export function Feed({ q, page }: { q: string; page: number }) {
       ) : (
         page === 1 && (
           <header className="mb-12">
+            {data && (
+              <p className="mb-3 flex items-center gap-2 font-mono text-[0.6875rem] uppercase tracking-[0.14em] text-muted">
+                <span className="relative flex h-1.5 w-1.5" aria-hidden="true">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent/60" />
+                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-accent" />
+                </span>
+                Currently building
+                <span className="text-faint" aria-hidden="true">·</span>
+                {data.total} {data.total === 1 ? "piece" : "pieces"} published
+              </p>
+            )}
             <p className="label text-accent">AMR · Journal</p>
             <h1 className="mt-4 text-balance font-display text-[2.4rem] font-semibold leading-[1.05] tracking-[-0.025em] sm:text-[3.25rem]">
               Writing on building software.
