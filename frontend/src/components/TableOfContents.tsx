@@ -39,10 +39,85 @@ function useActiveHeading(headings: Heading[]): string {
   return activeId;
 }
 
+// Left position of the connector at each heading depth — h3 sits further
+// right, matching the `pl-3` indent already on its <li>.
+const DEPTH_X = { 2: 4, 3: 16 } as const;
+// Half-length, in pixels, of the S-curve that eases the connector sideways
+// when depth changes between one heading and the next.
+const CURVE = 6;
+
+interface Geometry {
+  pathD: string;
+  totalHeight: number;
+  clipTop: number;
+  clipBottom: number;
+  dot: { x: number; y: number };
+}
+
 /**
- * `animated` swaps the old per-item static border for one continuous rail
- * with a single marker that slides to the active heading's position — a
- * timeline, not a row of borders switching on and off.
+ * Builds one continuous connector through every heading (shifting right for
+ * h3s, eased with a short bezier at each depth change — never a plain
+ * straight rail), then reports the pixel band covering the current
+ * top-level section so the caller can clip the connector to just that band.
+ */
+function computeGeometry(
+  headings: Heading[],
+  items: Map<string, HTMLLIElement>,
+  activeIndex: number
+): Geometry | null {
+  if (activeIndex < 0 || headings.length === 0) return null;
+  const rects = headings.map((h) => {
+    const el = items.get(h.id);
+    return el ? { top: el.offsetTop, bottom: el.offsetTop + el.offsetHeight } : null;
+  });
+  if (rects.some((r) => !r)) return null;
+  const bounds = rects as { top: number; bottom: number }[];
+
+  let d = "";
+  for (let i = 0; i < headings.length; i++) {
+    const x = DEPTH_X[headings[i].level];
+    if (i === 0) d += `M ${x} ${bounds[i].top} `;
+    const isLast = i === headings.length - 1;
+    const nextX = isLast ? x : DEPTH_X[headings[i + 1].level];
+    if (isLast || nextX === x) {
+      d += `L ${x} ${bounds[i].bottom} `;
+    } else {
+      const boundary = bounds[i].bottom;
+      d += `L ${x} ${boundary - CURVE} `;
+      d += `C ${x} ${boundary - CURVE / 2} ${nextX} ${boundary + CURVE / 2} ${nextX} ${boundary + CURVE} `;
+    }
+  }
+
+  // The current top-level section: its own heading through every
+  // subheading under it, not just the ones already scrolled past.
+  let groupStart = activeIndex;
+  for (let i = activeIndex; i >= 0; i--) {
+    groupStart = i;
+    if (headings[i].level === 2) break;
+  }
+  let groupEnd = headings.length - 1;
+  for (let i = groupStart + 1; i < headings.length; i++) {
+    if (headings[i].level === 2) {
+      groupEnd = i - 1;
+      break;
+    }
+  }
+
+  const active = bounds[activeIndex];
+  return {
+    pathD: d,
+    totalHeight: bounds[bounds.length - 1].bottom,
+    clipTop: bounds[groupStart].top,
+    clipBottom: bounds[groupEnd].bottom,
+    dot: { x: DEPTH_X[headings[activeIndex].level], y: (active.top + active.bottom) / 2 },
+  };
+}
+
+/**
+ * `animated` swaps the old per-item static border for a curved connector
+ * (never a plain straight rail) that only appears — via clip-path — across
+ * the current top-level section, with a dot pinpointing the exact active
+ * heading within it. Sections you haven't reached carry no line at all.
  */
 function TocList({
   headings,
@@ -54,58 +129,81 @@ function TocList({
   animated?: boolean;
 }) {
   const itemRefs = useRef(new Map<string, HTMLLIElement>());
-  const [marker, setMarker] = useState<{ top: number; height: number } | null>(null);
+  const [geometry, setGeometry] = useState<Geometry | null>(null);
+
+  const activeIndex = headings.findIndex((h) => h.id === activeId);
+  let groupStartIndex = activeIndex;
+  for (let i = activeIndex; i >= 0; i--) {
+    groupStartIndex = i;
+    if (headings[i].level === 2) break;
+  }
+  let groupEndIndex = headings.length - 1;
+  for (let i = groupStartIndex + 1; i < headings.length; i++) {
+    if (headings[i].level === 2) {
+      groupEndIndex = i - 1;
+      break;
+    }
+  }
 
   useLayoutEffect(() => {
     if (!animated) return;
-    const measure = () => {
-      const el = activeId ? itemRefs.current.get(activeId) : null;
-      setMarker(el ? { top: el.offsetTop, height: el.offsetHeight } : null);
-    };
+    const measure = () => setGeometry(computeGeometry(headings, itemRefs.current, activeIndex));
     measure();
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
-  }, [animated, activeId, headings]);
+  }, [animated, activeIndex, headings]);
 
   return (
     <ol className={animated ? "relative flex flex-col text-[0.8125rem]" : "flex flex-col text-[0.8125rem]"}>
-      {animated && (
+      {animated && geometry && (
         <>
-          <span aria-hidden="true" className="absolute left-0 top-0 bottom-0 w-px bg-rule" />
-          {marker && (
-            <span
-              aria-hidden="true"
-              className="absolute left-0 w-[3px] rounded-full bg-accent transition-[top,height] duration-300 ease-out"
-              style={{ top: marker.top, height: marker.height }}
-            />
-          )}
+          <svg
+            aria-hidden="true"
+            className="absolute left-0 top-0 overflow-visible transition-[clip-path] duration-300 ease-out"
+            width={20}
+            height={geometry.totalHeight}
+            style={{
+              clipPath: `inset(${geometry.clipTop}px 0 ${geometry.totalHeight - geometry.clipBottom}px 0)`,
+            }}
+          >
+            <path d={geometry.pathD} stroke="rgb(var(--accent))" strokeWidth={1.5} fill="none" />
+          </svg>
+          <span
+            aria-hidden="true"
+            className="absolute h-[6px] w-[6px] rounded-full bg-accent transition-[top,left] duration-300 ease-out"
+            style={{ top: geometry.dot.y - 3, left: geometry.dot.x - 3 }}
+          />
         </>
       )}
-      {headings.map((h, i) => (
-        <li
-          key={h.id}
-          ref={
-            animated
-              ? (el) => {
-                  if (el) itemRefs.current.set(h.id, el);
-                  else itemRefs.current.delete(h.id);
-                }
-              : undefined
-          }
-          className={h.level === 3 ? "pl-3" : undefined}
-        >
-          <a
-            href={`#${h.id}`}
-            aria-current={activeId === h.id ? "true" : undefined}
-            className={animated ? "toc-link toc-link--rail" : "toc-link"}
+      {headings.map((h, i) => {
+        const inRange = animated && activeIndex >= 0 && i >= groupStartIndex && i <= groupEndIndex;
+        return (
+          <li
+            key={h.id}
+            ref={
+              animated
+                ? (el) => {
+                    if (el) itemRefs.current.set(h.id, el);
+                    else itemRefs.current.delete(h.id);
+                  }
+                : undefined
+            }
+            className={h.level === 3 ? "pl-3" : undefined}
           >
-            <span className="mr-2 font-mono text-[0.6875rem] tabular-nums text-faint">
-              {String(i + 1).padStart(2, "0")}
-            </span>
-            {h.text}
-          </a>
-        </li>
-      ))}
+            <a
+              href={`#${h.id}`}
+              aria-current={activeId === h.id ? "true" : undefined}
+              className={animated ? "toc-link toc-link--rail" : "toc-link"}
+              style={inRange ? { color: "rgb(var(--accent))" } : undefined}
+            >
+              <span className="mr-2 font-mono text-[0.6875rem] tabular-nums text-faint">
+                {String(i + 1).padStart(2, "0")}
+              </span>
+              {h.text}
+            </a>
+          </li>
+        );
+      })}
     </ol>
   );
 }
