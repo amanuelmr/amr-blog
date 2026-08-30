@@ -41,7 +41,7 @@ function SavedPostsInner({ page }: { page: number }) {
 
   return (
     <div className="mx-auto max-w-4xl px-5 py-12 sm:px-6">
-      <h1 className="mb-8 font-serif text-3xl font-bold tracking-tight">Reading list</h1>
+      <h1 className="mb-8 font-display text-3xl font-bold tracking-tight">Reading list</h1>
 
       {loading ? (
         <Spinner label="Loading your reading list…" />

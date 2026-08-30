@@ -36,6 +36,7 @@ export interface Comment {
 }
 
 export type BlogStatus = "draft" | "published";
+export type PostType = "essay" | "field-note";
 
 export interface Blog {
   _id: string;
@@ -45,6 +46,7 @@ export interface Blog {
   titleBackgroundImageUrl?: string | null;
   author: Author | null;
   tags: string[];
+  postType?: PostType;
   status: BlogStatus;
   // A "published" post with a future publishedAt is scheduled, not live yet.
   publishedAt?: string | null;

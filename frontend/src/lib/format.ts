@@ -3,6 +3,11 @@ export function blogHref(blog: { _id: string; slug?: string }): string {
   return `/blog/${blog.slug || blog._id}`;
 }
 
+/** The reader-facing label for a post's type — undefined/legacy posts read as an essay. */
+export function postTypeLabel(postType?: "essay" | "field-note"): string {
+  return postType === "field-note" ? "Field note" : "Essay";
+}
+
 export type PublishState = "draft" | "scheduled" | "live";
 
 // A "published" post with a future publishedAt is scheduled, not live yet —

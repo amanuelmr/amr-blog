@@ -20,6 +20,9 @@ const blogSchema = new mongoose.Schema({
   content: { type: String, required: [true, "Content is required"] }, // Simple string content
   author: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   tags: [String],
+  // Essay: long-form, polished. Field note: a short observation or lesson.
+  // Purely editorial — doesn't affect visibility, routing, or moderation.
+  postType: { type: String, enum: ["essay", "field-note"], default: "essay" },
   createdAt: { type: Date, default: Date.now },
   // "published" with a future publishedAt is how a scheduled post stays
   // hidden until then (see utils/blogVisibility.js) — no separate

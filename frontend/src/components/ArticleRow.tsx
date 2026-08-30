@@ -15,28 +15,42 @@ export function ArticleRow({ blog, index }: { blog: Blog; index: number }) {
   return (
     <Link
       href={href}
-      className="group grid grid-cols-[2rem_1fr] items-baseline gap-x-4 gap-y-2 rule-top py-6 sm:grid-cols-[2.5rem_1fr_auto] sm:gap-x-6"
+      className="group grid grid-cols-[2rem_1fr] items-baseline gap-x-4 gap-y-2 border-t border-rule py-6 transition-colors duration-200 hover:border-fg/25 sm:grid-cols-[2.5rem_1fr_auto] sm:gap-x-6"
     >
-      <span className="font-mono text-[0.6875rem] tabular-nums text-faint transition-colors group-hover:text-accent">
+      <span className="font-mono text-[0.6875rem] tabular-nums text-faint transition-colors duration-200 group-hover:text-accent">
         {num}
       </span>
 
       <div className="min-w-0">
-        {blog.tags?.length > 0 && (
-          <p className="mb-1.5 font-mono text-[0.75rem] lowercase tracking-tight text-muted">
-            {blog.tags.slice(0, 2).join(" / ")}
+        {(blog.postType === "field-note" || blog.tags?.length > 0) && (
+          <p className="mb-1.5 flex items-center gap-2 font-mono text-[0.75rem] lowercase tracking-tight text-muted">
+            {blog.postType === "field-note" && (
+              <span className="label text-accent">Field note</span>
+            )}
+            {blog.postType === "field-note" && blog.tags?.length > 0 && (
+              <span className="text-faint" aria-hidden="true">/</span>
+            )}
+            {blog.tags?.length > 0 && blog.tags.slice(0, 2).join(" / ")}
           </p>
         )}
 
-        <h3 className="text-balance font-display text-[1.3rem] font-semibold leading-[1.25] tracking-[-0.015em] sm:text-[1.45rem]">
-          <span className="transition-colors group-hover:text-accent">{blog.title}</span>
+        <h3 className="flex items-baseline gap-2 text-balance font-display text-[1.3rem] font-semibold leading-[1.25] tracking-[-0.015em] sm:text-[1.45rem]">
+          <span className="inline-block transition duration-200 ease-out group-hover:translate-x-1 group-hover:text-accent">
+            {blog.title}
+          </span>
+          <span
+            aria-hidden="true"
+            className="-translate-x-1 text-accent opacity-0 transition duration-200 ease-out group-hover:translate-x-0 group-hover:opacity-100"
+          >
+            →
+          </span>
         </h3>
 
         <p className="mt-1.5 line-clamp-2 max-w-measure text-[0.9375rem] leading-relaxed text-muted">
           {excerpt(blog.content, 130)}
         </p>
 
-        <div className="mt-2 flex items-center gap-2 font-mono text-[0.6875rem] tabular-nums text-muted">
+        <div className="mt-2 flex items-center gap-2 font-mono text-[0.6875rem] tabular-nums text-muted transition-colors duration-200 group-hover:text-fg">
           <span>{formatDate(blog.createdAt)}</span>
           <span className="text-faint" aria-hidden="true">·</span>
           <span>{readingTime(blog.content)} min read</span>

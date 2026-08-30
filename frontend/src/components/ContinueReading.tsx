@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { Blog } from "@/lib/types";
 import { blogHref, formatDate, readingTime, excerpt } from "@/lib/format";
+import { InlineError, Skeleton } from "@/components/states";
 
 interface FeedResponse {
   blogs: Blog[];
@@ -12,29 +13,62 @@ interface FeedResponse {
 
 const RELATED = 3;
 
+type Status = "loading" | "error" | "success";
+
+function ContinueReadingSkeleton() {
+  return (
+    <section className="mt-16 rule-top pt-8" aria-hidden="true">
+      <Skeleton className="h-[0.6875rem] w-32" />
+      <ul className="mt-5 flex flex-col">
+        {Array.from({ length: RELATED }).map((_, i) => (
+          <li key={i} className={i === 0 ? "py-4" : "rule-top py-4"}>
+            <Skeleton className="h-5 w-full max-w-md" />
+            <Skeleton className="mt-2 h-3.5 w-full max-w-lg" />
+            <Skeleton className="mt-2 h-2.5 w-24" />
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 /**
  * An article that ends in a footer is a dead end. This picks up the reader:
  * pieces sharing a topic first, then the neighbours in publication order, so
  * there is always somewhere to go next.
  */
 export function ContinueReading({ blog }: { blog: Blog }) {
-  const [feed, setFeed] = useState<Blog[] | null>(null);
+  const [feed, setFeed] = useState<Blog[]>([]);
+  const [status, setStatus] = useState<Status>("loading");
 
-  useEffect(() => {
+  const load = useCallback(() => {
     let cancelled = false;
+    setStatus("loading");
     api<FeedResponse>("/blogs?limit=50")
       .then((res) => {
-        if (!cancelled) setFeed(res.blogs ?? []);
+        if (cancelled) return;
+        setFeed(res.blogs ?? []);
+        setStatus("success");
       })
       .catch(() => {
-        if (!cancelled) setFeed([]);
+        if (!cancelled) setStatus("error");
       });
     return () => {
       cancelled = true;
     };
   }, []);
 
-  if (!feed || feed.length < 2) return null;
+  useEffect(() => load(), [load]);
+
+  if (status === "loading") return <ContinueReadingSkeleton />;
+  if (status === "error") {
+    return (
+      <section className="mt-16 rule-top pt-8">
+        <InlineError message="Couldn't load more reading." onRetry={load} />
+      </section>
+    );
+  }
+  if (feed.length < 2) return null;
 
   const others = feed.filter((b) => b._id !== blog._id);
   const tags = new Set(blog.tags ?? []);

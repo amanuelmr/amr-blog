@@ -30,6 +30,35 @@ describe('Blog API', () => {
       await registerVerifyLogin(agent);
       await agent.post('/api/v1/blogs/create').send({ title: '' }).expect(400);
     });
+
+    it('defaults postType to essay and accepts field-note explicitly', async () => {
+      const agent = request.agent(app);
+      await registerVerifyLogin(agent);
+      const essay = await createBlog(agent).expect(201);
+      expect(essay.body.blog.postType).toBe('essay');
+
+      const note = await createBlog(agent, { postType: 'field-note' }).expect(201);
+      expect(note.body.blog.postType).toBe('field-note');
+    });
+
+    it('rejects an unrecognized postType', async () => {
+      const agent = request.agent(app);
+      await registerVerifyLogin(agent);
+      await createBlog(agent, { postType: 'tutorial' }).expect(400);
+    });
+  });
+
+  describe('edit', () => {
+    it('changes postType on an existing blog', async () => {
+      const agent = request.agent(app);
+      await registerVerifyLogin(agent);
+      const created = await createBlog(agent).expect(201);
+      const res = await agent
+        .put(`/api/v1/blogs/${created.body.blog._id}`)
+        .send({ postType: 'field-note' })
+        .expect(200);
+      expect(res.body.blog.postType).toBe('field-note');
+    });
   });
 
   describe('list & read', () => {

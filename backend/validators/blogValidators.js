@@ -22,6 +22,7 @@ const coverUrl = z
 // a schedule explicitly.
 const status = z.enum(["draft", "published"]).optional();
 const publishedAt = z.coerce.date().nullable().optional();
+const postType = z.enum(["essay", "field-note"]).optional();
 
 const createBlogSchema = z.object({
   title: z.string().trim().min(1, "Title is required").max(300),
@@ -30,6 +31,7 @@ const createBlogSchema = z.object({
   titleBackgroundImageUrl: coverUrl,
   status,
   publishedAt,
+  postType,
 });
 
 // All fields optional: an edit may update only the cover image without
@@ -41,6 +43,7 @@ const editBlogSchema = z.object({
   titleBackgroundImageUrl: coverUrl,
   status,
   publishedAt,
+  postType,
 });
 
 const commentSchema = z.object({
