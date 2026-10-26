@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { Blog } from "@/lib/types";
@@ -79,14 +79,23 @@ function FeedTabs({ view }: { view: FeedView }) {
 }
 
 export function Feed({ q, page, view }: { q: string; page: number; view: FeedView }) {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   // Recommendations need a signed-in reader and don't mix with search.
   const forYou = view === "for-you" && !q && !!user;
   const [data, setData] = useState<FeedResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // Which request is current. Auth resolves after the first render, so
+  // the feed can fire twice (signed-out, then signed-in); only the latest
+  // request's response may land, or a slow earlier one would overwrite it.
+  const requestId = useRef(0);
+
   const fetchData = useCallback(async () => {
+    // Until auth resolves we can't tell For you from Latest — wait rather
+    // than load (and flash) the wrong list.
+    if (view === "for-you" && authLoading) return;
+    const id = ++requestId.current;
     setLoading(true);
     setError("");
     try {
@@ -97,13 +106,15 @@ export function Feed({ q, page, view }: { q: string; page: number; view: FeedVie
           ? `/blogs/recommend?${params}`
           : `/blogs?${params}`;
       const res = await api<FeedResponse>(path);
+      if (id !== requestId.current) return;
       setData(res);
     } catch (err) {
+      if (id !== requestId.current) return;
       setError(err instanceof ApiError ? err.message : "Could not load articles.");
     } finally {
-      setLoading(false);
+      if (id === requestId.current) setLoading(false);
     }
-  }, [q, page, forYou]);
+  }, [q, page, forYou, view, authLoading]);
 
   useEffect(() => {
     fetchData();
