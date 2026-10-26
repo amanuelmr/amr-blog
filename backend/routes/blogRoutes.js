@@ -14,6 +14,10 @@
  *         title:
  *           type: string
  *           description: Blog's title
+ *         subtitle:
+ *           type: string
+ *           maxLength: 200
+ *           description: Optional one-line deck shown under the title and on cards
  *         content:
  *           type: string
  *           description: Blog's content as plain text

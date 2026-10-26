@@ -56,6 +56,30 @@ describe('Blog API', () => {
     });
   });
 
+  describe('subtitle', () => {
+    it('is stored on create, cleared with an empty string, and searchable', async () => {
+      const agent = request.agent(app);
+      await registerVerifyLogin(agent);
+      const created = await createBlog(agent, { subtitle: '  Why idempotency keys matter  ' }).expect(201);
+      expect(created.body.blog.subtitle).toBe('Why idempotency keys matter');
+
+      const found = await request(app).get('/api/v1/blogs/search?query=idempotency').expect(200);
+      expect(found.body.total).toBe(1);
+
+      const cleared = await agent
+        .put(`/api/v1/blogs/${created.body.blog._id}`)
+        .send({ subtitle: '' })
+        .expect(200);
+      expect(cleared.body.blog.subtitle).toBe('');
+    });
+
+    it('rejects a subtitle over 200 characters', async () => {
+      const agent = request.agent(app);
+      await registerVerifyLogin(agent);
+      await createBlog(agent, { subtitle: 'x'.repeat(201) }).expect(400);
+    });
+  });
+
   describe('edit', () => {
     it('changes postType on an existing blog', async () => {
       const agent = request.agent(app);

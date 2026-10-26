@@ -100,6 +100,11 @@ export function initials(name?: string): string {
     .join("");
 }
 
+/** A post's one-line summary for cards and previews: its subtitle, else an excerpt. */
+export function summary(blog: { subtitle?: string; content: string }, max = 160): string {
+  return blog.subtitle?.trim() || excerpt(blog.content, max);
+}
+
 /** Deterministic plain-text excerpt from (possibly HTML) content. */
 export function excerpt(content: string, max = 160): string {
   const clean = stripHtml(content);

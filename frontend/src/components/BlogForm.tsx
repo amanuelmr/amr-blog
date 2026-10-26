@@ -24,6 +24,7 @@ function toDateTimeLocal(iso: string): string {
 export function BlogForm({ mode, blog }: { mode: "create" | "edit"; blog?: Blog }) {
   const router = useRouter();
   const [title, setTitle] = useState(blog?.title ?? "");
+  const [subtitle, setSubtitle] = useState(blog?.subtitle ?? "");
   // Editor works in HTML; legacy plain-text posts are normalized on load.
   const [content, setContent] = useState(blog ? contentToHtml(blog.content) : "");
   const [tags, setTags] = useState<string[]>(blog?.tags ?? []);
@@ -103,6 +104,7 @@ export function BlogForm({ mode, blog }: { mode: "create" | "edit"; blog?: Blog 
           method: mode === "create" ? "POST" : "PUT",
           body: {
             title: title.trim(),
+            subtitle: subtitle.trim(),
             content,
             tags,
             postType,
@@ -187,7 +189,16 @@ export function BlogForm({ mode, blog }: { mode: "create" | "edit"; blog?: Blog 
           maxLength={300}
           aria-label="Title"
           placeholder="Title"
-          className="mb-4 w-full resize-none overflow-hidden border-0 bg-transparent p-0 font-display text-4xl font-bold leading-tight tracking-tight text-fg placeholder:text-muted/40 focus:outline-none focus:ring-0 sm:text-5xl"
+          className="mb-2 w-full resize-none overflow-hidden border-0 bg-transparent p-0 font-display text-4xl font-bold leading-tight tracking-tight text-fg placeholder:text-muted/40 focus:outline-none focus:ring-0 sm:text-5xl"
+        />
+
+        <input
+          value={subtitle}
+          onChange={(e) => setSubtitle(e.target.value)}
+          maxLength={200}
+          aria-label="Subtitle"
+          placeholder="Add a subtitle (optional)"
+          className="mb-6 w-full border-0 bg-transparent p-0 text-xl leading-snug text-muted placeholder:text-muted/40 focus:outline-none focus:ring-0"
         />
 
         <RichTextEditor value={content} onChange={setContent} />

@@ -42,6 +42,8 @@ export interface Blog {
   _id: string;
   slug?: string;
   title: string;
+  // Optional one-line deck under the title.
+  subtitle?: string;
   content: string;
   titleBackgroundImageUrl?: string | null;
   author: Author | null;

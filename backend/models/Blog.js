@@ -16,6 +16,9 @@ const blogSchema = new mongoose.Schema({
   // URL-friendly identifier (e.g. "the-quiet-architecture-9f3a1c"). Sparse so
   // pre-existing documents without a slug don't collide on the unique index.
   slug: { type: String, unique: true, sparse: true, index: true },
+  // Optional one-line deck under the title; cards and share previews use it
+  // instead of an auto-generated excerpt when present.
+  subtitle: { type: String, trim: true, maxlength: 200, default: "" },
   titleBackgroundImageUrl: { type: String }, // Optional field for title background image URL from file upload
   content: { type: String, required: [true, "Content is required"] }, // Simple string content
   author: { type: mongoose.Schema.Types.ObjectId, ref: "User" },

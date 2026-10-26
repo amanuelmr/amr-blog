@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Article } from "@/components/Article";
 import { serverApiBase } from "@/lib/api";
 import { Blog } from "@/lib/types";
-import { blogHref, excerpt, publishedDate } from "@/lib/format";
+import { blogHref, publishedDate, summary } from "@/lib/format";
 
 // Server-rendered so links shared to chat apps and social networks unfurl
 // with the post's own title, description and cover instead of the site
@@ -22,7 +22,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   const blog = await fetchBlog(params.id);
   if (!blog) return {};
 
-  const description = excerpt(blog.content, 160);
+  const description = summary(blog, 160);
   const images = blog.titleBackgroundImageUrl ? [{ url: blog.titleBackgroundImageUrl }] : undefined;
 
   return {

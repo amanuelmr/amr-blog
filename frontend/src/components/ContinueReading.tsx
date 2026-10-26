@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { Blog } from "@/lib/types";
-import { blogHref, formatDate, readingTime, excerpt, publishedDate } from "@/lib/format";
+import { blogHref, formatDate, readingTime, publishedDate, summary } from "@/lib/format";
 import { InlineError, Skeleton } from "@/components/states";
 
 interface FeedResponse {
@@ -105,7 +105,7 @@ export function ContinueReading({ blog }: { blog: Blog }) {
                     {b.title}
                   </h3>
                   <p className="mt-1 line-clamp-2 text-[0.9375rem] leading-relaxed text-muted">
-                    {excerpt(b.content, 120)}
+                    {summary(b, 120)}
                   </p>
                   <p className="mt-1.5 font-mono text-[0.6875rem] tabular-nums text-muted">
                     {formatDate(publishedDate(b))}

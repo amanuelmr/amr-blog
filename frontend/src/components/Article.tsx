@@ -126,6 +126,9 @@ export function Article({ id }: { id: string }) {
         <h1 className="text-balance font-display text-[2rem] font-semibold leading-[1.1] tracking-[-0.02em] sm:text-[2.6rem] md:text-[3rem]">
           {blog.title}
         </h1>
+        {blog.subtitle && (
+          <p className="mt-4 text-balance text-[1.2rem] leading-snug text-muted sm:text-[1.35rem]">{blog.subtitle}</p>
+        )}
 
         <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-2 rule-bottom pb-5 text-meta text-muted">
           {blog.author ? (

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Blog } from "@/lib/types";
 import { CoverImage } from "./CoverImage";
-import { formatDate, readingTime, blogHref, excerpt, publishedDate } from "@/lib/format";
+import { formatDate, readingTime, blogHref, publishedDate, summary } from "@/lib/format";
 
 /**
  * One line of the index. `index` is the running position in the whole feed,
@@ -47,7 +47,7 @@ export function ArticleRow({ blog, index }: { blog: Blog; index: number }) {
         </h3>
 
         <p className="mt-1.5 line-clamp-2 max-w-measure text-[0.9375rem] leading-relaxed text-muted">
-          {excerpt(blog.content, 130)}
+          {summary(blog, 130)}
         </p>
 
         <div className="mt-2 flex items-center gap-2 font-mono text-[0.6875rem] tabular-nums text-muted transition-colors duration-200 group-hover:text-fg">

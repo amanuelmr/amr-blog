@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Blog } from "@/lib/types";
 import { CoverImage } from "./CoverImage";
 import { Avatar } from "./Avatar";
-import { formatDate, readingTime, excerpt, blogHref, publishedDate } from "@/lib/format";
+import { formatDate, readingTime, blogHref, publishedDate, summary } from "@/lib/format";
 
 export function FeaturedLead({ blog }: { blog: Blog }) {
   const href = blogHref(blog);
@@ -35,7 +35,7 @@ export function FeaturedLead({ blog }: { blog: Blog }) {
           </h2>
 
           <p className="mt-4 max-w-measure text-[1.0625rem] leading-relaxed text-muted">
-            {excerpt(blog.content, 200)}
+            {summary(blog, 200)}
           </p>
 
           <div className="mt-5 flex flex-wrap items-center gap-2.5 font-mono text-[0.6875rem] tabular-nums text-muted">

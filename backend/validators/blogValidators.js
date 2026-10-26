@@ -32,6 +32,7 @@ const coverUrl = z
 const status = z.enum(["draft", "published"]).optional();
 const publishedAt = z.coerce.date().nullable().optional();
 const postType = z.enum(["essay", "field-note"]).optional();
+const subtitle = z.string().trim().max(200, "Subtitle is too long (max 200 characters)").optional();
 
 const createBlogSchema = z.object({
   title: z.string().trim().min(1, "Title is required").max(300),
@@ -41,6 +42,7 @@ const createBlogSchema = z.object({
   status,
   publishedAt,
   postType,
+  subtitle,
 });
 
 // All fields optional: an edit may update only the cover image without
@@ -53,6 +55,7 @@ const editBlogSchema = z.object({
   status,
   publishedAt,
   postType,
+  subtitle,
 });
 
 const commentSchema = z.object({

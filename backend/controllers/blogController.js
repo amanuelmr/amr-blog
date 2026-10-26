@@ -39,6 +39,7 @@ exports.createBlog = async (req, res) => {
 
     const blog = new Blog({
       title,
+      subtitle: req.body.subtitle || "",
       // Cover is uploaded directly to Cloudinary by the client; we store the URL.
       titleBackgroundImageUrl: req.body.titleBackgroundImageUrl || null,
       content: sanitizeContent(content), // rich HTML — sanitized before persisting
@@ -199,6 +200,7 @@ exports.editBlog = async (req, res) => {
     
     // Update fields if provided
     if (title) blog.title = title;
+    if (req.body.subtitle !== undefined) blog.subtitle = req.body.subtitle; // "" clears it
     if (content) blog.content = sanitizeContent(content);
     if (tags) {
       blog.tags = Array.isArray(tags) ? tags : tags.split(',').map(tag => tag.trim());
@@ -229,7 +231,7 @@ exports.editBlog = async (req, res) => {
       blog.publishedAt = req.body.publishedAt; // reschedule without changing status
     }
 
-    if (["title", "content", "tags", "titleBackgroundImageUrl"].some((f) => blog.isModified(f))) {
+    if (["title", "subtitle", "content", "tags", "titleBackgroundImageUrl"].some((f) => blog.isModified(f))) {
       blog.editedAt = new Date();
     }
 
@@ -301,6 +303,7 @@ exports.searchBlogs = async (req, res) => {
         {
           $or: [
             { title: { $regex: safeQuery, $options: "i" } },
+            { subtitle: { $regex: safeQuery, $options: "i" } },
             { content: { $regex: safeQuery, $options: "i" } },
             { tags: { $regex: `^${safeQuery}$`, $options: "i" } },
           ],
