@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Blog } from "@/lib/types";
 import { CoverImage } from "./CoverImage";
-import { formatDate, readingTime, blogHref, excerpt } from "@/lib/format";
+import { formatDate, readingTime, blogHref, excerpt, publishedDate } from "@/lib/format";
 
 /**
  * One line of the index. `index` is the running position in the whole feed,
@@ -51,7 +51,7 @@ export function ArticleRow({ blog, index }: { blog: Blog; index: number }) {
         </p>
 
         <div className="mt-2 flex items-center gap-2 font-mono text-[0.6875rem] tabular-nums text-muted transition-colors duration-200 group-hover:text-fg">
-          <span>{formatDate(blog.createdAt)}</span>
+          <span>{formatDate(publishedDate(blog))}</span>
           <span className="text-faint" aria-hidden="true">·</span>
           <span>{readingTime(blog.content)} min read</span>
         </div>

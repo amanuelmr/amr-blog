@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Blog } from "@/lib/types";
 import { CoverImage } from "./CoverImage";
 import { Avatar } from "./Avatar";
-import { formatDate, readingTime, excerpt, blogHref } from "@/lib/format";
+import { formatDate, readingTime, excerpt, blogHref, publishedDate } from "@/lib/format";
 
 export function FeaturedLead({ blog }: { blog: Blog }) {
   const href = blogHref(blog);
@@ -51,7 +51,7 @@ export function FeaturedLead({ blog }: { blog: Blog }) {
               </>
             )}
             <span className="text-faint" aria-hidden="true">·</span>
-            <span className="tabular-nums">{formatDate(blog.createdAt)}</span>
+            <span className="tabular-nums">{formatDate(publishedDate(blog))}</span>
             <span className="text-faint" aria-hidden="true">·</span>
             <span className="tabular-nums">{readingTime(blog.content)} min read</span>
           </div>

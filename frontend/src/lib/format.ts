@@ -18,6 +18,14 @@ export function publishState(blog: { status: string; publishedAt?: string | null
   return "live";
 }
 
+/**
+ * The date a reader should see on a post: when it went live. Legacy posts
+ * without a publishedAt fall back to when they were written.
+ */
+export function publishedDate(blog: { publishedAt?: string | null; createdAt: string }): string {
+  return blog.publishedAt || blog.createdAt;
+}
+
 export function formatDate(iso?: string): string {
   if (!iso) return "";
   const d = new Date(iso);

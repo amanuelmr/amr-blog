@@ -15,7 +15,7 @@ import { ContinueReading } from "./ContinueReading";
 import { TableOfContentsMobile, TableOfContentsDesktop } from "./TableOfContents";
 import { ReadingProgress } from "./ReadingProgress";
 import { Spinner, ErrorState } from "./states";
-import { formatDate, readingTime, contentToHtml, publishState } from "@/lib/format";
+import { formatDate, readingTime, contentToHtml, publishState, publishedDate } from "@/lib/format";
 import { withHeadingAnchors } from "@/lib/toc";
 import { enhanceCodeBlocks } from "@/lib/codeHighlight";
 import DOMPurify from "isomorphic-dompurify";
@@ -139,7 +139,7 @@ export function Article({ id }: { id: string }) {
             </span>
           )}
           <span className="text-border">·</span>
-          <span>{formatDate(blog.createdAt)}</span>
+          <span>{formatDate(publishedDate(blog))}</span>
           <span className="text-border">·</span>
           <span>{readingTime(blog.content)} min read</span>
           <span className="text-border">·</span>

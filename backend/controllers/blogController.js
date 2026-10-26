@@ -6,7 +6,7 @@ const getPagination = require("../utils/pagination");
 const sanitizeContent = require("../utils/sanitizeContent");
 const { makeSlug } = require("../utils/slugify");
 const { cloudinary } = require("../config/cloudinary");
-const { publicFilter, isPublished, isVisibleTo } = require("../utils/blogVisibility");
+const { publicFilter, isPublished, isVisibleTo, PUBLIC_SORT } = require("../utils/blogVisibility");
 
 // Create a blog
 exports.createBlog = async (req, res) => {
@@ -93,7 +93,7 @@ exports.getAllBlogs = async (req, res) => {
     const [blogs, total] = await Promise.all([
       Blog.find(filter)
         .populate("author", "name")
-        .sort({ createdAt: -1 })
+        .sort(PUBLIC_SORT)
         .skip(skip)
         .limit(limit),
       Blog.countDocuments(filter),
@@ -298,7 +298,7 @@ exports.searchBlogs = async (req, res) => {
     const [blogs, total] = await Promise.all([
       Blog.find(filter)
         .populate("author", "name")
-        .sort({ createdAt: -1 })
+        .sort(PUBLIC_SORT)
         .skip(skip)
         .limit(limit),
       Blog.countDocuments(filter),
@@ -350,7 +350,7 @@ exports.recommendBlogs = async (req, res) => {
       _id: { $nin: [...user.readBlogs, ...user.likedBlogs] }, // Exclude already read or liked blogs
     })
       .populate("author", "name")
-      .sort({ createdAt: -1 })
+      .sort(PUBLIC_SORT)
       .skip(skip)
       .limit(limit);
 
@@ -439,7 +439,7 @@ exports.getBookmarks = async (req, res) => {
     const { page, limit, skip } = getPagination(req.query);
     const filter = { _id: { $in: user.bookmarkedBlogs }, ...publicFilter() };
     const [blogs, total] = await Promise.all([
-      Blog.find(filter).populate("author", "name").sort({ createdAt: -1 }).skip(skip).limit(limit),
+      Blog.find(filter).populate("author", "name").sort(PUBLIC_SORT).skip(skip).limit(limit),
       Blog.countDocuments(filter),
     ]);
 

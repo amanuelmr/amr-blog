@@ -1,5 +1,5 @@
 import { serverApiBase } from "@/lib/api";
-import { blogHref, excerpt } from "@/lib/format";
+import { blogHref, excerpt, publishedDate } from "@/lib/format";
 import { Blog } from "@/lib/types";
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/$/, "");
@@ -26,7 +26,7 @@ function itemXml(blog: Blog): string {
     <title>${escapeXml(blog.title)}</title>
     <link>${url}</link>
     <guid isPermaLink="true">${url}</guid>
-    <pubDate>${new Date(blog.createdAt).toUTCString()}</pubDate>
+    <pubDate>${new Date(publishedDate(blog)).toUTCString()}</pubDate>
     ${author}
     <description>${escapeXml(excerpt(blog.content, 280))}</description>
   </item>`;

@@ -376,6 +376,37 @@ describe('Blog API', () => {
     });
   });
 
+  describe('publish-date ordering', () => {
+    it('orders the public feed by publish date, not creation date', async () => {
+      const agent = request.agent(app);
+      await registerVerifyLogin(agent);
+      // Created first, published now.
+      await createBlog(agent, { title: 'Written last week, live today' }).expect(201);
+      // Created second, but backdated: it went live yesterday.
+      const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      await createBlog(agent, { title: 'Live since yesterday', publishedAt: yesterday }).expect(201);
+
+      const feed = await request(app).get('/api/v1/blogs').expect(200);
+      expect(feed.body.blogs.map((b) => b.title)).toEqual([
+        'Written last week, live today',
+        'Live since yesterday',
+      ]);
+    });
+
+    it('backfills a missing publishedAt on live legacy posts from createdAt', async () => {
+      const Blog = require('../models/Blog');
+      const backfillPublishedAt = require('../utils/backfillPublishedAt');
+      const createdAt = new Date('2024-03-01T10:00:00Z');
+      const legacy = await Blog.create({ title: 'Legacy', content: 'Old', status: 'published', createdAt });
+      const draft = await Blog.create({ title: 'Draft', content: 'Wip', status: 'draft' });
+
+      await backfillPublishedAt();
+
+      expect((await Blog.findById(legacy._id)).publishedAt.toISOString()).toBe(createdAt.toISOString());
+      expect((await Blog.findById(draft._id)).publishedAt).toBeUndefined();
+    });
+  });
+
   describe('mine', () => {
     it("lists the author's own posts of every status, but requires auth", async () => {
       const agent = request.agent(app);
