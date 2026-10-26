@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useCallback, useState, ReactNode } from "react";
-import { useEditor, EditorContent, Editor, mergeAttributes } from "@tiptap/react";
+import { useEditor, useEditorState, EditorContent, Editor, mergeAttributes } from "@tiptap/react";
 import { BubbleMenu, FloatingMenu } from "@tiptap/react/menus";
 import StarterKit from "@tiptap/starter-kit";
 import { Placeholder } from "@tiptap/extensions";
@@ -50,6 +50,11 @@ const CaptionedImage = Image.extend({
 });
 
 type ImageField = "alt" | "caption";
+
+const NOTHING_SELECTED = {
+  image: false, alt: false, caption: false, bold: false, italic: false,
+  code: false, link: false, h2: false, h3: false, blockquote: false,
+};
 
 function MenuButton({
   onClick,
@@ -207,6 +212,30 @@ export function RichTextEditor({
     setImageField(null);
   }, [editor, imageField, imageValue]);
 
+  // The editor doesn't re-render this component on selection changes, so
+  // anything the menus show about the current selection is read through a
+  // subscription rather than straight off the editor during render. The
+  // snapshot is null until the editor's first transaction, so `sel` falls
+  // back to nothing selected.
+  const sel = useEditorState({
+    editor,
+    selector: ({ editor: ed }) =>
+      ed
+        ? {
+            image: ed.isActive("image"),
+            alt: !!ed.getAttributes("image").alt,
+            caption: !!ed.getAttributes("image").caption,
+            bold: ed.isActive("bold"),
+            italic: ed.isActive("italic"),
+            code: ed.isActive("code"),
+            link: ed.isActive("link"),
+            h2: ed.isActive("heading", { level: 2 }),
+            h3: ed.isActive("heading", { level: 3 }),
+            blockquote: ed.isActive("blockquote"),
+          }
+        : null,
+  }) ?? NOTHING_SELECTED;
+
   if (!editor) {
     return <div className="min-h-[360px]" />;
   }
@@ -255,12 +284,12 @@ export function RichTextEditor({
             />
             <MenuButton title="Apply" onClick={applyImageField}><CheckIcon /></MenuButton>
           </div>
-        ) : e.isActive("image") ? (
+        ) : sel.image ? (
           <>
-            <MenuButton title="Alt text" active={!!e.getAttributes("image").alt} onClick={() => openImageField("alt")}>
+            <MenuButton title="Alt text" active={sel.alt} onClick={() => openImageField("alt")}>
               <span className="text-xs font-semibold">ALT</span>
             </MenuButton>
-            <MenuButton title="Caption" active={!!e.getAttributes("image").caption} onClick={() => openImageField("caption")}>
+            <MenuButton title="Caption" active={sel.caption} onClick={() => openImageField("caption")}>
               <span className="text-xs font-semibold">Caption</span>
             </MenuButton>
           </>
@@ -282,14 +311,14 @@ export function RichTextEditor({
           </div>
         ) : (
           <>
-            <MenuButton title="Bold" active={e.isActive("bold")} onClick={() => e.chain().focus().toggleBold().run()}><BoldIcon /></MenuButton>
-            <MenuButton title="Italic" active={e.isActive("italic")} onClick={() => e.chain().focus().toggleItalic().run()}><ItalicIcon /></MenuButton>
-            <MenuButton title="Inline code" active={e.isActive("code")} onClick={() => e.chain().focus().toggleCode().run()}><CodeIcon /></MenuButton>
-            <MenuButton title="Link" active={e.isActive("link")} onClick={openLink}><LinkIcon /></MenuButton>
+            <MenuButton title="Bold" active={sel.bold} onClick={() => e.chain().focus().toggleBold().run()}><BoldIcon /></MenuButton>
+            <MenuButton title="Italic" active={sel.italic} onClick={() => e.chain().focus().toggleItalic().run()}><ItalicIcon /></MenuButton>
+            <MenuButton title="Inline code" active={sel.code} onClick={() => e.chain().focus().toggleCode().run()}><CodeIcon /></MenuButton>
+            <MenuButton title="Link" active={sel.link} onClick={openLink}><LinkIcon /></MenuButton>
             <Divider />
-            <MenuButton title="Heading 2" active={e.isActive("heading", { level: 2 })} onClick={() => e.chain().focus().toggleHeading({ level: 2 }).run()}><H2Icon /></MenuButton>
-            <MenuButton title="Heading 3" active={e.isActive("heading", { level: 3 })} onClick={() => e.chain().focus().toggleHeading({ level: 3 }).run()}><H3Icon /></MenuButton>
-            <MenuButton title="Quote" active={e.isActive("blockquote")} onClick={() => e.chain().focus().toggleBlockquote().run()}><QuoteIcon /></MenuButton>
+            <MenuButton title="Heading 2" active={sel.h2} onClick={() => e.chain().focus().toggleHeading({ level: 2 }).run()}><H2Icon /></MenuButton>
+            <MenuButton title="Heading 3" active={sel.h3} onClick={() => e.chain().focus().toggleHeading({ level: 3 }).run()}><H3Icon /></MenuButton>
+            <MenuButton title="Quote" active={sel.blockquote} onClick={() => e.chain().focus().toggleBlockquote().run()}><QuoteIcon /></MenuButton>
             <MenuButton title="Add image" onClick={() => fileRef.current?.click()}><ImageIcon /></MenuButton>
           </>
         )}
