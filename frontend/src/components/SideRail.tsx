@@ -125,7 +125,7 @@ export function SideRail({ currentId }: { currentId?: string }) {
             {topics.map(([tag, count]) => (
               <li key={tag} className="rule-top first:border-t-0">
                 <Link
-                  href={`/?q=${encodeURIComponent(tag)}`}
+                  href={`/tag/${encodeURIComponent(tag)}`}
                   className="group flex items-baseline justify-between gap-3 py-2"
                 >
                   <span className="truncate font-mono text-[0.8125rem] text-muted transition-colors group-hover:text-accent">

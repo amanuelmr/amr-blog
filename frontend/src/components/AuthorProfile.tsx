@@ -64,7 +64,10 @@ export function AuthorProfile({ id, page }: { id: string; page: number }) {
         <Avatar name={profile.name} size={64} />
         <div className="min-w-0 flex-1">
           <h1 className="font-display text-2xl font-bold tracking-tight">{profile.name}</h1>
-          <p className="mt-0.5 text-sm text-muted">Joined {formatDate(profile.createdAt)}</p>
+          <p className="mt-0.5 flex flex-wrap gap-x-3 text-sm text-muted">
+            <span>Joined {formatDate(profile.createdAt)}</span>
+            <a href={`/author/${id}/rss.xml`} className="text-accent hover:underline">RSS feed</a>
+          </p>
 
           {profile.bio ? (
             <p className="mt-3 max-w-prose text-fg/90">{profile.bio}</p>

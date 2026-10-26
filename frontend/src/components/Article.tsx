@@ -115,7 +115,7 @@ export function Article({ id }: { id: string }) {
             {blog.tags?.map((t, i) => (
               <span key={t} className="flex items-center gap-2">
                 {i > 0 && <span className="text-faint" aria-hidden="true">/</span>}
-                <Link href={`/?q=${encodeURIComponent(t)}`} className="hover:underline">
+                <Link href={`/tag/${encodeURIComponent(t)}`} className="hover:underline">
                   {t}
                 </Link>
               </span>

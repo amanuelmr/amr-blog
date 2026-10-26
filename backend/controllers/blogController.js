@@ -83,13 +83,17 @@ exports.createBlog = async (req, res) => {
 
 // Get all blogs (paginated). Drafts and not-yet-due scheduled posts are
 // excluded — this is the public feed. An optional ?author=<userId> narrows
-// it to one author's posts, for their public profile page.
+// it to one author's posts, for their public profile page, and ?tag=<tag>
+// to one topic (whole-tag, case-insensitive), for topic pages.
 exports.getAllBlogs = async (req, res) => {
   try {
     const { page, limit, skip } = getPagination(req.query);
     const filter = { ...publicFilter() };
     if (req.query.author && mongoose.isValidObjectId(req.query.author)) {
       filter.author = req.query.author;
+    }
+    if (typeof req.query.tag === "string" && req.query.tag.trim()) {
+      filter.tags = { $regex: `^${escapeRegex(req.query.tag.trim())}$`, $options: "i" };
     }
     const [blogs, total] = await Promise.all([
       Blog.find(filter)
@@ -294,9 +298,9 @@ exports.searchBlogs = async (req, res) => {
     // (prevents regex injection / ReDoS).
     const safeQuery = escapeRegex(query.trim());
     // $and, not a spread: publicFilter() already has its own top-level $or.
-    // Tags match whole-string (anchored) rather than as a substring: the tag
-    // chips on an article link here, and a chip must return the posts carrying
-    // that exact tag — not every post that happens to mention the word.
+    // Tags match whole-string (anchored) rather than as a substring: searching
+    // a tag's name should return the posts carrying that exact tag — not
+    // every post whose tags merely contain the word.
     const filter = {
       $and: [
         publicFilter(),

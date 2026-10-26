@@ -156,6 +156,16 @@ describe('Blog API', () => {
       expect(res.body._id).toBe(created.body.blog._id);
     });
 
+    it('filters the feed to one exact tag, case-insensitively', async () => {
+      const agent = request.agent(app);
+      await registerVerifyLogin(agent);
+      await createBlog(agent, { title: 'Tagged', tags: 'Rust,systems' }).expect(201);
+      await createBlog(agent, { title: 'Near miss', tags: 'rustic' }).expect(201);
+
+      const res = await request(app).get('/api/v1/blogs?tag=rust').expect(200);
+      expect(res.body.blogs.map((b) => b.title)).toEqual(['Tagged']);
+    });
+
     it("filters the feed to one author's posts for their profile page", async () => {
       const alice = request.agent(app);
       await registerVerifyLogin(alice, { email: 'alice@example.com', name: 'Alice' });
