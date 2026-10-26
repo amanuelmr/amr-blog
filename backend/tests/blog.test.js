@@ -207,6 +207,29 @@ describe('Blog API', () => {
     });
   });
 
+  describe('recommend', () => {
+    it("suggests unread posts on the topics a reader has read, excluding their own", async () => {
+      const author = request.agent(app);
+      await registerVerifyLogin(author);
+      const read = await createBlog(author, { title: 'Read one', tags: 'go' }).expect(201);
+      await createBlog(author, { title: 'Same topic', tags: 'go' }).expect(201);
+      await createBlog(author, { title: 'Other topic', tags: 'css' }).expect(201);
+
+      const reader = request.agent(app);
+      await registerVerifyLogin(reader, { email: 'reader@example.com', name: 'Reader' });
+      await createBlog(reader, { title: 'Reader wrote this', tags: 'go' }).expect(201);
+      await reader.get(`/api/v1/blogs/${read.body.blog._id}`).expect(200);
+
+      const res = await reader.get('/api/v1/blogs/recommend').expect(200);
+      expect(res.body.total).toBe(1);
+      expect(res.body.blogs.map((b) => b.title)).toEqual(['Same topic']);
+    });
+
+    it('requires auth', async () => {
+      await request(app).get('/api/v1/blogs/recommend').expect(401);
+    });
+  });
+
   describe('share', () => {
     it('counts shares of a live post without requiring auth', async () => {
       const agent = request.agent(app);

@@ -359,20 +359,21 @@ exports.recommendBlogs = async (req, res) => {
     const allTags = [...new Set([...likedTags, ...readTags])];
 
 
-    // Find blogs that match the tags but are not already read or liked by the user
-    const { limit, skip } = getPagination(req.query);
-    const recommendedBlogs = await Blog.find({
+    // Live posts on those topics that the user hasn't read or liked yet and
+    // didn't write. Paginated like the other lists.
+    const { page, limit, skip } = getPagination(req.query);
+    const filter = {
       ...publicFilter(),
       tags: { $in: allTags },
-      _id: { $nin: [...user.readBlogs, ...user.likedBlogs] }, // Exclude already read or liked blogs
-    })
-      .populate("author", "name")
-      .sort(PUBLIC_SORT)
-      .skip(skip)
-      .limit(limit);
+      _id: { $nin: [...user.readBlogs, ...user.likedBlogs].map((b) => b._id) },
+      author: { $ne: user._id },
+    };
+    const [blogs, total] = await Promise.all([
+      Blog.find(filter).populate("author", "name").sort(PUBLIC_SORT).skip(skip).limit(limit),
+      Blog.countDocuments(filter),
+    ]);
 
-    // Send recommended blogs
-    res.json(recommendedBlogs);
+    res.json({ blogs, total, page, limit, totalPages: Math.ceil(total / limit) });
   } catch (error) {
     console.error(error.message);
     res.status(500).send("Server error");

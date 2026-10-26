@@ -150,7 +150,7 @@ router.get('/upload-signature', authMiddleware, BlogController.uploadSignature);
  * @swagger
  * /blogs/recommend:
  *   get:
- *     summary: Recommend blogs based on likes and reads
+ *     summary: Recommend unread live blogs on the topics of the user's likes and reads (paginated, excludes their own posts)
  *     tags: [Blogs]
  *     security:
  *       - bearerAuth: []

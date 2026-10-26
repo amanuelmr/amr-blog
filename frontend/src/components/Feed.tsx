@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
+import { useAuth } from "@/context/AuthContext";
 import { Blog } from "@/lib/types";
 import { api, ApiError } from "@/lib/api";
 import { FeaturedLead } from "./FeaturedLead";
@@ -49,7 +51,37 @@ function FeedSkeleton() {
   );
 }
 
-export function Feed({ q, page }: { q: string; page: number }) {
+export type FeedView = "latest" | "for-you";
+
+// Latest / For you switch. Only for signed-in readers — recommendations come
+// from what they've read and liked.
+function FeedTabs({ view }: { view: FeedView }) {
+  const tabs: { id: FeedView; label: string; href: string }[] = [
+    { id: "latest", label: "Latest", href: "/" },
+    { id: "for-you", label: "For you", href: "/?view=for-you" },
+  ];
+  return (
+    <nav aria-label="Feed" className="mb-8 flex gap-6 border-b border-rule">
+      {tabs.map((t) => (
+        <Link
+          key={t.id}
+          href={t.href}
+          aria-current={view === t.id ? "page" : undefined}
+          className={`-mb-px border-b-2 pb-3 text-sm font-medium transition-colors ${
+            view === t.id ? "border-accent text-fg" : "border-transparent text-muted hover:text-fg"
+          }`}
+        >
+          {t.label}
+        </Link>
+      ))}
+    </nav>
+  );
+}
+
+export function Feed({ q, page, view }: { q: string; page: number; view: FeedView }) {
+  const { user } = useAuth();
+  // Recommendations need a signed-in reader and don't mix with search.
+  const forYou = view === "for-you" && !q && !!user;
   const [data, setData] = useState<FeedResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -61,7 +93,9 @@ export function Feed({ q, page }: { q: string; page: number }) {
       const params = new URLSearchParams({ page: String(page), limit: String(PAGE_SIZE) });
       const path = q
         ? `/blogs/search?query=${encodeURIComponent(q)}&${params}`
-        : `/blogs?${params}`;
+        : forYou
+          ? `/blogs/recommend?${params}`
+          : `/blogs?${params}`;
       const res = await api<FeedResponse>(path);
       setData(res);
     } catch (err) {
@@ -69,16 +103,16 @@ export function Feed({ q, page }: { q: string; page: number }) {
     } finally {
       setLoading(false);
     }
-  }, [q, page]);
+  }, [q, page, forYou]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
   const makeHref = (p: number) =>
-    q ? `/?q=${encodeURIComponent(q)}&page=${p}` : `/?page=${p}`;
+    q ? `/?q=${encodeURIComponent(q)}&page=${p}` : forYou ? `/?view=for-you&page=${p}` : `/?page=${p}`;
 
-  const showHero = !q && page === 1;
+  const showHero = !q && page === 1 && !forYou;
   const blogs = data?.blogs ?? [];
   const listBlogs = showHero ? blogs.slice(1) : blogs;
   // Continuous numbering: page 2 starts where page 1 left off.
@@ -102,7 +136,8 @@ export function Feed({ q, page }: { q: string; page: number }) {
       ) : (
         page === 1 && (
           <header className="mb-12">
-            {data && (
+            {/* On For you, data.total counts recommendations, not the archive. */}
+            {data && !forYou && (
               <p className="mb-3 flex items-center gap-2 font-mono text-[0.6875rem] uppercase tracking-[0.14em] text-muted">
                 <span className="relative flex h-1.5 w-1.5" aria-hidden="true">
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent/60" />
@@ -126,15 +161,23 @@ export function Feed({ q, page }: { q: string; page: number }) {
 
       <div className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_16rem] lg:gap-14">
         <div className="min-w-0">
+      {user && !q && <FeedTabs view={forYou ? "for-you" : "latest"} />}
       {loading ? (
         <FeedSkeleton />
       ) : error ? (
         <ErrorState message={error} onRetry={fetchData} />
       ) : blogs.length === 0 ? (
-        <EmptyState
-          title={q ? "No matching articles" : "No articles yet"}
-          hint={q ? "Try a different search term." : "Check back soon — or write the first one."}
-        />
+        forYou ? (
+          <EmptyState
+            title="Nothing to recommend yet"
+            hint="Read or like a few pieces and you'll find more on the same topics here."
+          />
+        ) : (
+          <EmptyState
+            title={q ? "No matching articles" : "No articles yet"}
+            hint={q ? "Try a different search term." : "Check back soon — or write the first one."}
+          />
+        )
       ) : (
         <>
           {showHero && (
@@ -145,7 +188,9 @@ export function Feed({ q, page }: { q: string; page: number }) {
 
           {listBlogs.length > 0 && (
             <section>
-              <SectionLabel>{showHero ? "The Latest" : q ? "Results" : "More stories"}</SectionLabel>
+              <SectionLabel>
+                {showHero ? "The Latest" : q ? "Results" : forYou ? "Picked for you" : "More stories"}
+              </SectionLabel>
               <div>
                 {listBlogs.map((b, i) => (
                   <ArticleRow key={b._id} blog={b} index={rowOffset + i} />
