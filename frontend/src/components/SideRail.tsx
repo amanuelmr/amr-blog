@@ -11,6 +11,10 @@ interface FeedResponse {
   blogs: Blog[];
 }
 
+interface TopicsResponse {
+  topics: { tag: string; count: number }[];
+}
+
 const MOST_READ = 5;
 const MAX_TOPICS = 10;
 
@@ -38,21 +42,26 @@ function RailSkeleton() {
 
 /**
  * The secondary column: what people actually read, and what the journal
- * actually covers. Both are derived from one feed request rather than new
- * endpoints, and both show real numbers — a rail of invented "trending"
- * would be decoration, not information.
+ * actually covers, across the whole archive. Both show real numbers — a
+ * rail of invented "trending" would be decoration, not information.
  */
 export function SideRail({ currentId }: { currentId?: string }) {
-  const [blogs, setBlogs] = useState<Blog[]>([]);
+  const [popular, setPopular] = useState<Blog[]>([]);
+  const [topics, setTopics] = useState<[string, number][]>([]);
   const [status, setStatus] = useState<Status>("loading");
 
   const load = useCallback(() => {
     let cancelled = false;
     setStatus("loading");
-    api<FeedResponse>("/blogs?limit=50")
-      .then((res) => {
+    // One extra so the list is still full after leaving out the current post.
+    Promise.all([
+      api<FeedResponse>(`/blogs?sort=popular&limit=${MOST_READ + 1}`),
+      api<TopicsResponse>(`/blogs/topics?limit=${MAX_TOPICS}`),
+    ])
+      .then(([pop, top]) => {
         if (cancelled) return;
-        setBlogs(res.blogs ?? []);
+        setPopular(pop.blogs ?? []);
+        setTopics((top.topics ?? []).map((t) => [t.tag, t.count]));
         setStatus("success");
       })
       .catch(() => {
@@ -73,18 +82,9 @@ export function SideRail({ currentId }: { currentId?: string }) {
       </div>
     );
   }
-  if (blogs.length === 0) return null;
+  if (popular.length === 0) return null;
 
-  const mostRead = [...blogs]
-    .filter((b) => b._id !== currentId)
-    .sort((a, b) => (b.views ?? 0) - (a.views ?? 0))
-    .slice(0, MOST_READ);
-
-  const counts: Record<string, number> = {};
-  for (const b of blogs) for (const t of b.tags ?? []) counts[t] = (counts[t] ?? 0) + 1;
-  const topics = Object.entries(counts)
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-    .slice(0, MAX_TOPICS);
+  const mostRead = popular.filter((b) => b._id !== currentId).slice(0, MOST_READ);
 
   return (
     <aside className="flex flex-col gap-10">

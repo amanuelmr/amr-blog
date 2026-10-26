@@ -85,6 +85,7 @@ exports.createBlog = async (req, res) => {
 // excluded — this is the public feed. An optional ?author=<userId> narrows
 // it to one author's posts, for their public profile page, and ?tag=<tag>
 // to one topic (whole-tag, case-insensitive), for topic pages.
+// ?sort=popular orders by views instead of recency.
 exports.getAllBlogs = async (req, res) => {
   try {
     const { page, limit, skip } = getPagination(req.query);
@@ -95,10 +96,11 @@ exports.getAllBlogs = async (req, res) => {
     if (typeof req.query.tag === "string" && req.query.tag.trim()) {
       filter.tags = { $regex: `^${escapeRegex(req.query.tag.trim())}$`, $options: "i" };
     }
+    const sort = req.query.sort === "popular" ? { views: -1, ...PUBLIC_SORT } : PUBLIC_SORT;
     const [blogs, total] = await Promise.all([
       Blog.find(filter)
         .populate("author", "name")
-        .sort(PUBLIC_SORT)
+        .sort(sort)
         .skip(skip)
         .limit(limit),
       Blog.countDocuments(filter),
@@ -111,6 +113,26 @@ exports.getAllBlogs = async (req, res) => {
       limit,
       totalPages: Math.ceil(total / limit),
     });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send("Server error");
+  }
+};
+
+// The most-used tags across every live post, with how many posts carry
+// each — most-used first, ties alphabetical.
+exports.getTopics = async (req, res) => {
+  try {
+    const limit = Math.min(Math.max(Number(req.query.limit) || 10, 1), 50);
+    const topics = await Blog.aggregate([
+      { $match: publicFilter() },
+      { $unwind: "$tags" },
+      { $group: { _id: "$tags", count: { $sum: 1 } } },
+      { $sort: { count: -1, _id: 1 } },
+      { $limit: limit },
+      { $project: { _id: 0, tag: "$_id", count: 1 } },
+    ]);
+    res.json({ topics });
   } catch (err) {
     console.error(err.message);
     res.status(500).send("Server error");

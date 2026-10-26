@@ -510,6 +510,28 @@ describe('Blog API', () => {
     });
   });
 
+  describe('popular & topics', () => {
+    it('orders by views with sort=popular and counts topics across live posts', async () => {
+      const agent = request.agent(app);
+      await registerVerifyLogin(agent);
+      const quiet = await createBlog(agent, { title: 'Quiet', tags: 'go,css' }).expect(201);
+      const busy = await createBlog(agent, { title: 'Busy', tags: 'go' }).expect(201);
+      await createBlog(agent, { title: 'Hidden', tags: 'secret', status: 'draft' }).expect(201);
+      await request.agent(app).get(`/api/v1/blogs/${busy.body.blog._id}`).expect(200);
+      await request.agent(app).get(`/api/v1/blogs/${busy.body.blog._id}`).expect(200);
+      await request.agent(app).get(`/api/v1/blogs/${quiet.body.blog._id}`).expect(200);
+
+      const popular = await request(app).get('/api/v1/blogs?sort=popular').expect(200);
+      expect(popular.body.blogs.map((b) => b.title)).toEqual(['Busy', 'Quiet']);
+
+      const topics = await request(app).get('/api/v1/blogs/topics').expect(200);
+      expect(topics.body.topics).toEqual([
+        { tag: 'go', count: 2 },
+        { tag: 'css', count: 1 },
+      ]);
+    });
+  });
+
   describe('view counting', () => {
     const viewsOf = async (id) => (await request(app).get(`/api/v1/blogs/${id}?view=false`)).body.views;
 

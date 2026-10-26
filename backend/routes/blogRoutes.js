@@ -217,6 +217,25 @@ router.get('/search', BlogController.searchBlogs);
 
 /**
  * @swagger
+ * /blogs/topics:
+ *   get:
+ *     summary: Most-used tags across all live blogs, with post counts
+ *     tags: [Blogs]
+ *     parameters:
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *           maximum: 50
+ *     responses:
+ *       200:
+ *         description: "{ topics: [{ tag, count }] }, most-used first"
+ */
+router.get('/topics', BlogController.getTopics);
+
+/**
+ * @swagger
  * /blogs:
  *   get:
  *     summary: Get all blogs
@@ -232,6 +251,12 @@ router.get('/search', BlogController.searchBlogs);
  *         schema:
  *           type: string
  *         description: Narrow to posts carrying this exact tag (case-insensitive)
+ *       - in: query
+ *         name: sort
+ *         schema:
+ *           type: string
+ *           enum: [popular]
+ *         description: "popular orders by views; omit for newest-published first"
  *     responses:
  *       200:
  *         description: List of all blogs
