@@ -180,7 +180,7 @@ export function RichTextEditor({
         </div>
       )}
 
-      {/* Selection toolbar (Medium-style) */}
+      {/* Selection toolbar */}
       <BubbleMenu
         editor={editor}
         className="flex items-center gap-0.5 rounded-xl border border-border bg-card p-1 shadow-xl"
@@ -216,7 +216,7 @@ export function RichTextEditor({
         )}
       </BubbleMenu>
 
-      {/* Insert menu on empty lines (Medium-style "+") */}
+      {/* Insert menu on empty lines ("+") */}
       <FloatingMenu
         editor={editor}
         className="flex items-center gap-0.5 rounded-xl border border-border bg-card p-1 shadow-xl"

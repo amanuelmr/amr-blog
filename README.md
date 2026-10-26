@@ -1,6 +1,6 @@
 # AMR Blog
 
-A full-stack blogging platform — a REST API and a modern reading/writing client. Write articles in a Medium-style rich-text editor, publish with cover images, and browse a clean editorial feed. Authentication is email-verified (OTP) with JWT access/refresh tokens delivered as httpOnly cookies.
+A full-stack blogging platform — a REST API and a modern reading/writing client. Write articles in a distraction-free rich-text editor, publish with cover images, and browse a clean editorial feed. Authentication is email-verified (OTP) with JWT access/refresh tokens delivered as httpOnly cookies.
 
 **Monorepo:**
 
@@ -14,7 +14,7 @@ A full-stack blogging platform — a REST API and a modern reading/writing clien
 ## Features
 
 - **Auth** — register → email OTP verification → login, with password reset and change-password flows. Access/refresh JWTs are stored in **httpOnly cookies**; the API auto-refreshes on expiry.
-- **Rich-text authoring** — a Medium-style Tiptap editor (headings, lists, quotes, code, links, inline images via drag/drop/paste) with a distraction-free composer (full-width cover dropzone, borderless title, chip tags); code blocks get syntax highlighting and a copy button on render.
+- **Rich-text authoring** — a Tiptap editor with a selection toolbar and an insert menu (headings, lists, quotes, code, links, inline images via drag/drop/paste) with a distraction-free composer (full-width cover dropzone, borderless title, chip tags); code blocks get syntax highlighting and a copy button on render.
 - **Publishing controls** — save a post as a **draft**, **schedule** it for a future date, or publish immediately; a "Your posts" dashboard lists every post you own regardless of status.
 - **Content safety** — article HTML is sanitized server-side (`xss` allowlist) before it is stored, and again with DOMPurify on render (defense-in-depth).
 - **Reading experience** — an editorial home feed (featured lead + numbered list), full article pages with an auto-generated **table of contents**, **view counts**, **likes**, a **reading list** (bookmarks), threaded **comments**, tag/topic filtering, and full-text **search** with pagination.
