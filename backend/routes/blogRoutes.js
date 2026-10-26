@@ -471,7 +471,7 @@ router.get('/:id/comments', optionalAuth, BlogController.getComments);
  * @swagger
  * /blogs/{id}/comments/{commentId}:
  *   delete:
- *     summary: Delete a comment on a blog
+ *     summary: Delete a comment on a blog (its commenter, or the blog's author)
  *     tags: [Blogs]
  *     security:
  *       - bearerAuth: []

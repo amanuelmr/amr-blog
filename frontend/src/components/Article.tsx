@@ -202,7 +202,7 @@ export function Article({ id }: { id: string }) {
 
         <ContinueReading blog={blog} />
 
-        <CommentSection blogId={blog._id} />
+        <CommentSection blogId={blog._id} postAuthorId={blog.author?._id} />
       </article>
 
       <TableOfContentsDesktop headings={headings} />

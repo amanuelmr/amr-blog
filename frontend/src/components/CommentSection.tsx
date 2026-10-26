@@ -29,7 +29,7 @@ function groupByThread(comments: Comment[]) {
   return { topLevel, repliesByParent };
 }
 
-export function CommentSection({ blogId }: { blogId: string }) {
+export function CommentSection({ blogId, postAuthorId }: { blogId: string; postAuthorId?: string }) {
   const { user } = useAuth();
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -138,6 +138,8 @@ export function CommentSection({ blogId }: { blogId: string }) {
 
   function CommentBody({ c, isReply }: { c: Comment; isReply: boolean }) {
     const mine = !!user && c.user?._id === user._id;
+    // A post's author can remove any comment on it, but only edit their own.
+    const canDelete = mine || (!!user && !!postAuthorId && user._id === postAuthorId);
     return (
       <div className="flex gap-3">
         <Avatar name={c.user?.name} size={isReply ? 30 : 36} />
@@ -168,20 +170,20 @@ export function CommentSection({ blogId }: { blogId: string }) {
                 </button>
               )}
               {mine && (
-                <>
-                  <button
-                    className="hover:text-fg"
-                    onClick={() => {
-                      setEditingId(c._id);
-                      setEditText(c.text);
-                    }}
-                  >
-                    Edit
-                  </button>
-                  <button className="hover:text-red-500" onClick={() => remove(c._id)}>
-                    Delete
-                  </button>
-                </>
+                <button
+                  className="hover:text-fg"
+                  onClick={() => {
+                    setEditingId(c._id);
+                    setEditText(c.text);
+                  }}
+                >
+                  Edit
+                </button>
+              )}
+              {canDelete && (
+                <button className="hover:text-red-500" onClick={() => remove(c._id)}>
+                  {mine ? "Delete" : "Remove"}
+                </button>
               )}
             </div>
           )}

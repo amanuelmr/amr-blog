@@ -317,6 +317,28 @@ describe('Blog API', () => {
       await agent.post(`/api/v1/blogs/${id}/comments`).send({ text: '   ' }).expect(400);
     });
 
+    it("lets a post's author delete anyone's comment, but not edit it", async () => {
+      const author = request.agent(app);
+      await registerVerifyLogin(author);
+      const { body } = await createBlog(author).expect(201);
+      const id = body.blog._id;
+
+      const reader = request.agent(app);
+      await registerVerifyLogin(reader, { email: 'reader@example.com', name: 'Reader' });
+      const posted = await reader.post(`/api/v1/blogs/${id}/comments`).send({ text: 'Spam' }).expect(201);
+      const commentId = posted.body.comment._id;
+
+      const bystander = request.agent(app);
+      await registerVerifyLogin(bystander, { email: 'bystander@example.com', name: 'Bystander' });
+      await bystander.delete(`/api/v1/blogs/${id}/comments/${commentId}`).expect(401);
+
+      await author.put(`/api/v1/blogs/${id}/comments/${commentId}`).send({ text: 'Edited' }).expect(401);
+      await author.delete(`/api/v1/blogs/${id}/comments/${commentId}`).expect(200);
+
+      const list = await request(app).get(`/api/v1/blogs/${id}/comments`).expect(200);
+      expect(list.body.total).toBe(0);
+    });
+
     describe('threaded replies', () => {
       it('replies to a top-level comment and lists them alongside it', async () => {
         const agent = request.agent(app);

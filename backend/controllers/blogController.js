@@ -590,7 +590,10 @@ exports.deleteComment = async (req, res) => {
       return res.status(404).json({ msg: "Comment not found" });
     }
 
-    if (comment.user.toString() !== req.user.id) {
+    // The commenter can delete their own comment, and a post's author can
+    // remove any comment on their post (moderation). Editing stays
+    // commenter-only — an author shouldn't put words in a reader's mouth.
+    if (comment.user.toString() !== req.user.id && !isOwner(blog, req.user)) {
       return res
         .status(401)
         .json({ msg: "User not authorized to delete this comment" });
