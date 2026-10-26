@@ -24,8 +24,16 @@ const plexMono = IBM_Plex_Mono({
   weight: ["400", "500", "600", "700"],
 });
 
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/$/, "");
+
 export const metadata: Metadata = {
-  title: "AMR Blog — writing on building software",
+  // Resolves relative canonical/Open Graph URLs set by individual pages.
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: "AMR Blog — writing on building software",
+    template: "%s — AMR Blog",
+  },
+  openGraph: { siteName: "AMR Blog", type: "website" },
   description:
     "Articles on backend, systems, and the craft of building software. Read, discuss, and publish.",
   alternates: {
