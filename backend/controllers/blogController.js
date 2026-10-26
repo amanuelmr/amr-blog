@@ -6,7 +6,7 @@ const getPagination = require("../utils/pagination");
 const sanitizeContent = require("../utils/sanitizeContent");
 const { makeSlug } = require("../utils/slugify");
 const { cloudinary } = require("../config/cloudinary");
-const { publicFilter, isPublished, isVisibleTo, PUBLIC_SORT } = require("../utils/blogVisibility");
+const { publicFilter, isPublished, isOwner, isVisibleTo, PUBLIC_SORT } = require("../utils/blogVisibility");
 
 // Create a blog
 exports.createBlog = async (req, res) => {
@@ -112,6 +112,9 @@ exports.getAllBlogs = async (req, res) => {
   }
 };
 
+// How long an anonymous browser's view of a post counts as the same view.
+const VIEW_WINDOW_MS = 12 * 60 * 60 * 1000;
+
 // Get a blog by slug (preferred) or by Mongo id (backward compatible). A
 // draft, or a scheduled post whose publish date hasn't arrived, 404s for
 // anyone but its author — attach optionalAuth so req.user is available
@@ -135,30 +138,37 @@ exports.getBlogById = async (req, res) => {
       await blog.save();
     }
 
-    // Count a real read: publicly live (a draft/scheduled preview is only
-    // reachable by its author anyway) and not explicitly opted out — the
-    // edit page passes ?view=false since loading a draft isn't a read.
-    // $inc stays atomic under concurrent requests; re-checking the public
-    // condition in the query guards against the post's status changing
-    // between the fetch above and this update.
-    if (req.query.view !== "false" && isPublished(blog)) {
-      await Blog.updateOne({ _id: blog._id, ...publicFilter() }, { $inc: { views: 1 } });
-      blog.views += 1;
-    }
-
     // `bookmarked` reflects the requester's own saved posts (bookmarks live
     // on User, not Blog, so it can't be derived from the blog doc alone).
-    let bookmarked = false;
-    if (req.user) {
-      const user = await User.findById(req.user.id);
-      if (user) {
-        bookmarked = user.bookmarkedBlogs.some((b) => b.toString() === blog._id.toString());
-        const alreadyRead = user.readBlogs.some((b) => b.toString() === blog._id.toString());
-        if (!alreadyRead) {
-          user.readBlogs.push(blog._id);
-          await user.save();
-        }
+    const user = req.user ? await User.findById(req.user.id) : null;
+    const bookmarked = !!user && user.bookmarkedBlogs.some((b) => b.toString() === blog._id.toString());
+    const alreadyRead = !!user && user.readBlogs.some((b) => b.toString() === blog._id.toString());
+
+    // Count a view once per reader: a signed-in reader the first time they
+    // open the post, an anonymous one once per browser per VIEW_WINDOW_MS
+    // (tracked with a cookie). The author's own visits never count, nor does
+    // a load that opts out (?view=false — the edit page) or a draft/scheduled
+    // preview. $inc stays atomic under concurrent requests; re-checking the
+    // public condition in the query guards against the post's status
+    // changing between the fetch above and this update.
+    const seenCookie = `seen_${blog._id}`;
+    const repeat = user ? alreadyRead : Boolean(req.cookies?.[seenCookie]);
+    if (req.query.view !== "false" && isPublished(blog) && !isOwner(blog, req.user) && !repeat) {
+      await Blog.updateOne({ _id: blog._id, ...publicFilter() }, { $inc: { views: 1 } });
+      blog.views += 1;
+      if (!user) {
+        res.cookie(seenCookie, "1", {
+          httpOnly: true,
+          maxAge: VIEW_WINDOW_MS,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+        });
       }
+    }
+
+    if (user && !alreadyRead) {
+      user.readBlogs.push(blog._id);
+      await user.save();
     }
 
     const payload = blog.toObject();

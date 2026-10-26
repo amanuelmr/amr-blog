@@ -412,6 +412,47 @@ describe('Blog API', () => {
     });
   });
 
+  describe('view counting', () => {
+    const viewsOf = async (id) => (await request(app).get(`/api/v1/blogs/${id}?view=false`)).body.views;
+
+    it("doesn't count the author's own visits", async () => {
+      const author = request.agent(app);
+      await registerVerifyLogin(author);
+      const { body } = await createBlog(author).expect(201);
+      await author.get(`/api/v1/blogs/${body.blog._id}`).expect(200);
+      await author.get(`/api/v1/blogs/${body.blog._id}`).expect(200);
+      expect(await viewsOf(body.blog._id)).toBe(0);
+    });
+
+    it('counts a signed-in reader once, however often they come back', async () => {
+      const author = request.agent(app);
+      await registerVerifyLogin(author);
+      const { body } = await createBlog(author).expect(201);
+
+      const reader = request.agent(app);
+      await registerVerifyLogin(reader, { email: 'reader@example.com', name: 'Reader' });
+      await reader.get(`/api/v1/blogs/${body.blog._id}`).expect(200);
+      await reader.get(`/api/v1/blogs/${body.blog._id}`).expect(200);
+      expect(await viewsOf(body.blog._id)).toBe(1);
+    });
+
+    it('counts an anonymous browser once (cookie), but separate browsers separately', async () => {
+      const author = request.agent(app);
+      await registerVerifyLogin(author);
+      const { body } = await createBlog(author).expect(201);
+      const id = body.blog._id;
+
+      const browser = request.agent(app);
+      const first = await browser.get(`/api/v1/blogs/${id}`).expect(200);
+      expect(first.body.views).toBe(1);
+      const again = await browser.get(`/api/v1/blogs/${id}`).expect(200);
+      expect(again.body.views).toBe(1);
+
+      await request.agent(app).get(`/api/v1/blogs/${id}`).expect(200);
+      expect(await viewsOf(id)).toBe(2);
+    });
+  });
+
   describe('publish-date ordering', () => {
     it('orders the public feed by publish date, not creation date', async () => {
       const agent = request.agent(app);
