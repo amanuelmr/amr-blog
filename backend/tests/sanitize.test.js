@@ -18,6 +18,13 @@ describe("sanitizeContent (stored-XSS gate)", () => {
     expect(out).not.toMatch(/onclick/i);
   });
 
+  it("keeps a captioned image (figure, img alt, figcaption) as the editor writes it", () => {
+    const html =
+      '<figure><img src="https://res.cloudinary.com/x.png" alt="A cat on a desk">' +
+      "<figcaption>The office supervisor</figcaption></figure>";
+    expect(sanitizeContent(html)).toBe(html);
+  });
+
   it("keeps safe formatting, links (with rel/target) and https images", () => {
     const out = sanitizeContent(
       '<h2>Title</h2><strong>b</strong><em>i</em>' +

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useCallback, useState, ReactNode } from "react";
-import { useEditor, EditorContent, Editor } from "@tiptap/react";
+import { useEditor, EditorContent, Editor, mergeAttributes } from "@tiptap/react";
 import { BubbleMenu, FloatingMenu } from "@tiptap/react/menus";
 import StarterKit from "@tiptap/starter-kit";
 import { Placeholder } from "@tiptap/extensions";
@@ -13,6 +13,43 @@ import {
   BoldIcon, ItalicIcon, CodeIcon, LinkIcon, H2Icon, H3Icon, QuoteIcon,
   BulletListIcon, OrderedListIcon, ImageIcon, DividerIcon, CheckIcon, TrashIcon,
 } from "./EditorIcons";
+
+// An image that carries its own alt text and an optional caption. With a
+// caption it renders as <figure><img><figcaption>, otherwise as a bare
+// <img>, and it parses both shapes back (the sanitizer allows figure and
+// figcaption, and img's alt). The caption is a plain-text attribute edited
+// from the bubble menu rather than editable rich content.
+const CaptionedImage = Image.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      caption: { default: null, rendered: false },
+    };
+  },
+  parseHTML() {
+    return [
+      {
+        tag: "figure",
+        getAttrs: (el) => {
+          const img = (el as HTMLElement).querySelector("img");
+          if (!img?.getAttribute("src")) return false;
+          return {
+            src: img.getAttribute("src"),
+            alt: img.getAttribute("alt"),
+            caption: (el as HTMLElement).querySelector("figcaption")?.textContent?.trim() || null,
+          };
+        },
+      },
+      { tag: "img[src]" },
+    ];
+  },
+  renderHTML({ node, HTMLAttributes }) {
+    const img = ["img", mergeAttributes(this.options.HTMLAttributes, HTMLAttributes)] as const;
+    return node.attrs.caption ? ["figure", {}, img, ["figcaption", {}, node.attrs.caption]] : img;
+  },
+});
+
+type ImageField = "alt" | "caption";
 
 function MenuButton({
   onClick,
@@ -54,6 +91,8 @@ export function RichTextEditor({
   const editorRef = useRef<Editor | null>(null);
   const [linkMode, setLinkMode] = useState(false);
   const [linkValue, setLinkValue] = useState("");
+  const [imageField, setImageField] = useState<ImageField | null>(null);
+  const [imageValue, setImageValue] = useState("");
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
 
@@ -91,7 +130,7 @@ export function RichTextEditor({
         },
       }),
       Placeholder.configure({ placeholder: "Tell your story…" }),
-      Image.configure({ HTMLAttributes: { class: "rounded-xl" } }),
+      CaptionedImage.configure({ HTMLAttributes: { class: "rounded-xl" } }),
     ],
     content: value || "",
     editorProps: {
@@ -153,6 +192,21 @@ export function RichTextEditor({
     setLinkMode(false);
   }, [editor]);
 
+  const openImageField = useCallback(
+    (field: ImageField) => {
+      if (!editor) return;
+      setImageValue((editor.getAttributes("image")[field] as string) || "");
+      setImageField(field);
+    },
+    [editor]
+  );
+
+  const applyImageField = useCallback(() => {
+    if (!editor || !imageField) return;
+    editor.chain().focus().updateAttributes("image", { [imageField]: imageValue.trim() || null }).run();
+    setImageField(null);
+  }, [editor, imageField, imageValue]);
+
   if (!editor) {
     return <div className="min-h-[360px]" />;
   }
@@ -185,7 +239,32 @@ export function RichTextEditor({
         editor={editor}
         className="flex items-center gap-0.5 rounded-xl border border-border bg-card p-1 shadow-xl"
       >
-        {linkMode ? (
+        {imageField ? (
+          <div className="flex items-center gap-1 px-1">
+            <input
+              autoFocus
+              value={imageValue}
+              onChange={(ev) => setImageValue(ev.target.value)}
+              onKeyDown={(ev) => {
+                if (ev.key === "Enter") { ev.preventDefault(); applyImageField(); }
+                if (ev.key === "Escape") { ev.preventDefault(); setImageField(null); }
+              }}
+              placeholder={imageField === "alt" ? "Describe the image for screen readers…" : "Write a caption…"}
+              aria-label={imageField === "alt" ? "Alt text" : "Caption"}
+              className="w-64 rounded-md border border-border bg-bg px-2 py-1.5 text-sm text-fg focus:border-accent focus:outline-none"
+            />
+            <MenuButton title="Apply" onClick={applyImageField}><CheckIcon /></MenuButton>
+          </div>
+        ) : e.isActive("image") ? (
+          <>
+            <MenuButton title="Alt text" active={!!e.getAttributes("image").alt} onClick={() => openImageField("alt")}>
+              <span className="text-xs font-semibold">ALT</span>
+            </MenuButton>
+            <MenuButton title="Caption" active={!!e.getAttributes("image").caption} onClick={() => openImageField("caption")}>
+              <span className="text-xs font-semibold">Caption</span>
+            </MenuButton>
+          </>
+        ) : linkMode ? (
           <div className="flex items-center gap-1 px-1">
             <input
               autoFocus
