@@ -9,7 +9,8 @@ import { FormAlert } from "@/components/AuthCard";
 import { RichTextEditor } from "@/components/editor/RichTextEditor";
 import { CoverImageInput } from "@/components/editor/CoverImageInput";
 import { TagInput } from "@/components/ui/TagInput";
-import { stripHtml, contentToHtml, blogHref, publishState } from "@/lib/format";
+import { stripHtml, contentToHtml, blogHref, publishState, relativeTime } from "@/lib/format";
+import { useLocalDraft } from "@/components/editor/useLocalDraft";
 import { uploadToCloudinary } from "@/lib/uploadToCloudinary";
 
 type Action = "draft" | "publish" | "schedule";
@@ -34,6 +35,28 @@ export function BlogForm({ mode, blog }: { mode: "create" | "edit"; blog?: Blog 
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const titleRef = useRef<HTMLTextAreaElement>(null);
+  // Bumped to remount the editor when recovered content replaces its value
+  // (the editor only reads `value` on mount).
+  const [editorKey, setEditorKey] = useState(0);
+
+  const [initialFields] = useState(() => ({
+    title: blog?.title ?? "",
+    subtitle: blog?.subtitle ?? "",
+    content: blog ? contentToHtml(blog.content) : "",
+    tags: blog?.tags ?? [],
+  }));
+  const localDraft = useLocalDraft(blog?._id, initialFields, { title, subtitle, content, tags });
+  const { recovered } = localDraft;
+
+  function restoreLocalDraft() {
+    if (!recovered) return;
+    setTitle(recovered.title);
+    setSubtitle(recovered.subtitle);
+    setContent(recovered.content);
+    setTags(recovered.tags);
+    setEditorKey((k) => k + 1);
+    localDraft.dismissRecovered();
+  }
 
   const wasAlreadyLive = !!blog && publishState(blog) === "live";
   const [action, setAction] = useState<Action>(() => {
@@ -113,6 +136,7 @@ export function BlogForm({ mode, blog }: { mode: "create" | "edit"; blog?: Blog 
           },
         }
       );
+      localDraft.clear();
       router.push(res.blog.status === "draft" ? "/write/mine" : blogHref(res.blog));
       router.refresh();
     } catch (err) {
@@ -179,6 +203,20 @@ export function BlogForm({ mode, blog }: { mode: "create" | "edit"; blog?: Blog 
           </div>
         )}
 
+        {recovered && (
+          <div className="mb-6 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-sm text-amber-700 dark:text-amber-400">
+            <span className="flex-1">
+              You have unsaved changes from {relativeTime(new Date(recovered.savedAt).toISOString())}.
+            </span>
+            <button type="button" onClick={restoreLocalDraft} className="font-medium underline underline-offset-2">
+              Restore
+            </button>
+            <button type="button" onClick={localDraft.discard} className="text-muted hover:text-fg">
+              Discard
+            </button>
+          </div>
+        )}
+
         <CoverImageInput preview={preview} onSelect={selectCover} onRemove={removeCover} />
 
         <textarea
@@ -201,7 +239,7 @@ export function BlogForm({ mode, blog }: { mode: "create" | "edit"; blog?: Blog 
           className="mb-6 w-full border-0 bg-transparent p-0 text-xl leading-snug text-muted placeholder:text-muted/40 focus:outline-none focus:ring-0"
         />
 
-        <RichTextEditor value={content} onChange={setContent} />
+        <RichTextEditor key={editorKey} value={content} onChange={setContent} />
 
         <div className="mt-12 border-t border-border pt-6">
           <p className="mb-3 text-xs font-medium uppercase tracking-wider text-muted">Tags</p>
