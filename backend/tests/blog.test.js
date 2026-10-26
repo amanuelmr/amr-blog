@@ -41,6 +41,14 @@ describe('Blog API', () => {
       expect(note.body.blog.postType).toBe('field-note');
     });
 
+    it('rejects more than 5 tags, as an array or a comma-separated string', async () => {
+      const agent = request.agent(app);
+      await registerVerifyLogin(agent);
+      await createBlog(agent, { tags: 'a,b,c,d,e,f' }).expect(400);
+      await createBlog(agent, { tags: ['a', 'b', 'c', 'd', 'e', 'f'] }).expect(400);
+      await createBlog(agent, { tags: 'a,b,c,d,e' }).expect(201);
+    });
+
     it('rejects an unrecognized postType', async () => {
       const agent = request.agent(app);
       await registerVerifyLogin(agent);

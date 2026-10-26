@@ -1,7 +1,16 @@
 const { z } = require("zod");
 
 // Tags may arrive as an array (JSON) or a comma-separated string (form-data).
-const tags = z.union([z.array(z.string()), z.string()]).optional();
+// The editor caps tags at MAX_TAGS; enforce it here too so the API can't be
+// used to get around it.
+const MAX_TAGS = 5;
+const tooManyTags = `A post can have at most ${MAX_TAGS} tags`;
+const tags = z
+  .union([
+    z.array(z.string()).max(MAX_TAGS, tooManyTags),
+    z.string().refine((s) => s.split(",").filter((t) => t.trim()).length <= MAX_TAGS, tooManyTags),
+  ])
+  .optional();
 
 // Content is rich HTML from the editor; cap size before it reaches the
 // sanitizer/DB. min(1) rejects empty submissions (raw string).
