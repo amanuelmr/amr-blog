@@ -8,7 +8,7 @@ import { RequireAuth } from "./RequireAuth";
 import { Spinner, EmptyState, ErrorState } from "./states";
 import { Pagination } from "./Pagination";
 import { LinkButton } from "./ui/Button";
-import { blogHref, formatDate, publishState } from "@/lib/format";
+import { blogHref, formatDate, publishState, publishedDate } from "@/lib/format";
 
 const PAGE_SIZE = 20;
 
@@ -33,6 +33,32 @@ function StatusBadge({ blog }: { blog: Blog }) {
     <span className={`inline-flex flex-none items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${tone}`}>
       {label}
     </span>
+  );
+}
+
+function count(n: number, noun: string) {
+  return `${n.toLocaleString()} ${noun}${n === 1 ? "" : "s"}`;
+}
+
+// How a live post is doing, at a glance. Drafts and scheduled posts have no
+// readers yet, so they show when they were started instead.
+function PostStats({ blog }: { blog: Blog }) {
+  if (publishState(blog) !== "live") {
+    return <p className="mt-1 text-xs text-muted">Started {formatDate(blog.createdAt)}</p>;
+  }
+  const stats = [
+    count(blog.views ?? 0, "view"),
+    count(blog.likes?.length ?? 0, "like"),
+    count(blog.comments?.length ?? 0, "comment"),
+    count(blog.shares ?? 0, "share"),
+  ];
+  return (
+    <p className="mt-1 flex flex-wrap gap-x-2 text-xs tabular-nums text-muted">
+      <span>{formatDate(publishedDate(blog))}</span>
+      {stats.map((s) => (
+        <span key={s} className="before:mr-2 before:text-faint before:content-['·']">{s}</span>
+      ))}
+    </p>
   );
 }
 
@@ -78,7 +104,7 @@ function MyPostsInner({ page }: { page: number }) {
               <li key={b._id} className="flex items-center justify-between gap-4 py-4">
                 <div className="min-w-0">
                   <p className="truncate font-medium text-fg">{b.title || "Untitled"}</p>
-                  <p className="mt-1 text-xs text-muted">{formatDate(b.createdAt)}</p>
+                  <PostStats blog={b} />
                 </div>
                 <div className="flex flex-none items-center gap-3">
                   <StatusBadge blog={b} />
