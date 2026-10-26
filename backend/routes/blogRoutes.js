@@ -364,6 +364,27 @@ router.post('/:id/like', authMiddleware, BlogController.likeBlog);
 
 /**
  * @swagger
+ * /blogs/{id}/share:
+ *   post:
+ *     summary: Record that a published blog was shared (link copied or sent to a network)
+ *     tags: [Blogs]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Blog ID
+ *     responses:
+ *       200:
+ *         description: "{ shares: number } — the new total"
+ *       404:
+ *         description: Blog not found (or not published)
+ */
+router.post('/:id/share', BlogController.shareBlog);
+
+/**
+ * @swagger
  * /blogs/{id}/bookmark:
  *   post:
  *     summary: Toggle saving a blog to the current user's reading list

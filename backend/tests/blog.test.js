@@ -183,6 +183,25 @@ describe('Blog API', () => {
     });
   });
 
+  describe('share', () => {
+    it('counts shares of a live post without requiring auth', async () => {
+      const agent = request.agent(app);
+      await registerVerifyLogin(agent);
+      const { body } = await createBlog(agent).expect(201);
+      const id = body.blog._id;
+
+      expect((await request(app).post(`/api/v1/blogs/${id}/share`).expect(200)).body.shares).toBe(1);
+      expect((await request(app).post(`/api/v1/blogs/${id}/share`).expect(200)).body.shares).toBe(2);
+    });
+
+    it("404s for a draft, so a private post can't be probed", async () => {
+      const agent = request.agent(app);
+      await registerVerifyLogin(agent);
+      const { body } = await createBlog(agent, { status: 'draft' }).expect(201);
+      await request(app).post(`/api/v1/blogs/${body.blog._id}/share`).expect(404);
+    });
+  });
+
   describe('bookmarks', () => {
     it('bookmarks and unbookmarks a blog, and lists it on the reading list while saved', async () => {
       const agent = request.agent(app);

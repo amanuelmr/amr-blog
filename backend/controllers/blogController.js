@@ -412,6 +412,30 @@ exports.likeBlog = async (req, res) => {
   }
 };
 
+// Record that a reader shared a post (copied its link or sent it to a
+// network). Anonymous readers can share too, so no auth is required; the
+// counter is a rough signal, not an audit log.
+exports.shareBlog = async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    return res.status(404).json({ msg: "Blog not found" });
+  }
+  try {
+    const blog = await Blog.findById(req.params.id);
+    if (!blog || !isPublished(blog)) {
+      return res.status(404).json({ msg: "Blog not found" });
+    }
+    const updated = await Blog.findByIdAndUpdate(
+      blog._id,
+      { $inc: { shares: 1 } },
+      { new: true, projection: { shares: 1 } }
+    );
+    res.json({ shares: updated.shares });
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).send("Server error");
+  }
+};
+
 // Save/unsave a blog to the current user's reading list. Bookmarks live on
 // User, not Blog, so (unlike likeBlog) this doesn't touch the blog doc.
 exports.toggleBookmark = async (req, res) => {

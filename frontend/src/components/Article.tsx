@@ -10,6 +10,7 @@ import { CoverImage } from "./CoverImage";
 import { Avatar } from "./Avatar";
 import { LikeButton } from "./LikeButton";
 import { BookmarkButton } from "./BookmarkButton";
+import { ShareButton } from "./ShareButton";
 import { CommentSection } from "./CommentSection";
 import { ContinueReading } from "./ContinueReading";
 import { TableOfContentsMobile, TableOfContentsDesktop } from "./TableOfContents";
@@ -193,6 +194,7 @@ export function Article({ id }: { id: string }) {
         <div className="mt-8 flex items-center justify-center gap-3">
           <LikeButton blogId={blog._id} initialLikes={blog.likes ?? []} />
           <BookmarkButton blogId={blog._id} initialBookmarked={blog.bookmarked ?? false} />
+          {state === "live" && <ShareButton blogId={blog._id} title={blog.title} />}
         </div>
 
         <ContinueReading blog={blog} />
