@@ -24,6 +24,10 @@ const blogSchema = new mongoose.Schema({
   // Purely editorial — doesn't affect visibility, routing, or moderation.
   postType: { type: String, enum: ["essay", "field-note"], default: "essay" },
   createdAt: { type: Date, default: Date.now },
+  // Set when the author changes what readers see (title, body, tags, cover).
+  // Not a general updatedAt: likes, comments and view counts don't touch it,
+  // so it's safe to use as the sitemap's lastModified.
+  editedAt: { type: Date },
   // "published" with a future publishedAt is how a scheduled post stays
   // hidden until then (see utils/blogVisibility.js) — no separate
   // "scheduled" status needed.

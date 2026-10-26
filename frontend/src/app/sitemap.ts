@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 import { serverApiBase } from "@/lib/api";
-import { blogHref } from "@/lib/format";
+import { blogHref, publishedDate } from "@/lib/format";
 import { Blog } from "@/lib/types";
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/$/, "");
@@ -36,7 +36,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const postRoutes: MetadataRoute.Sitemap = blogs.map((b) => ({
     url: `${SITE_URL}${blogHref(b)}`,
-    lastModified: b.createdAt,
+    lastModified: b.editedAt || publishedDate(b),
     changeFrequency: "weekly",
     priority: 0.8,
   }));

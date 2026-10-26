@@ -58,6 +58,8 @@ export interface Blog {
   views: number;
   comments: Comment[];
   createdAt: string;
+  // Last time the author changed the title, body, tags or cover.
+  editedAt?: string | null;
 }
 
 export interface Paginated<T> {

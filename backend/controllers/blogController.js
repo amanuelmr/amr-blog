@@ -219,6 +219,10 @@ exports.editBlog = async (req, res) => {
       blog.publishedAt = req.body.publishedAt; // reschedule without changing status
     }
 
+    if (["title", "content", "tags", "titleBackgroundImageUrl"].some((f) => blog.isModified(f))) {
+      blog.editedAt = new Date();
+    }
+
     // Keep the slug stable across edits (link permanence); backfill if missing.
     if (!blog.slug) {
       blog.slug = makeSlug(blog.title, blog._id);

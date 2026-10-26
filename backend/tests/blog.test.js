@@ -69,6 +69,34 @@ describe('Blog API', () => {
     });
   });
 
+  describe('editedAt', () => {
+    it('is set by a content edit but not by a like or a comment', async () => {
+      const agent = request.agent(app);
+      await registerVerifyLogin(agent);
+      const created = await createBlog(agent).expect(201);
+      const id = created.body.blog._id;
+      expect(created.body.blog.editedAt).toBeUndefined();
+
+      const liked = await agent.post(`/api/v1/blogs/${id}/like`).expect(200);
+      expect(liked.body.editedAt).toBeUndefined();
+      await agent.post(`/api/v1/blogs/${id}/comments`).send({ text: 'Nice' }).expect(201);
+
+      const edited = await agent.put(`/api/v1/blogs/${id}`).send({ title: 'Retitled' }).expect(200);
+      expect(edited.body.blog.editedAt).toBeDefined();
+    });
+
+    it('is not set by a status-only change', async () => {
+      const agent = request.agent(app);
+      await registerVerifyLogin(agent);
+      const created = await createBlog(agent, { status: 'draft' }).expect(201);
+      const res = await agent
+        .put(`/api/v1/blogs/${created.body.blog._id}`)
+        .send({ status: 'published' })
+        .expect(200);
+      expect(res.body.blog.editedAt).toBeUndefined();
+    });
+  });
+
   describe('list & read', () => {
     it('returns a paginated payload', async () => {
       const agent = request.agent(app);
