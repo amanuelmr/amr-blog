@@ -1,5 +1,5 @@
 const request = require('supertest');
-const app = require('../index');
+const app = require('./server');
 const { registerVerifyLogin } = require('./helpers');
 
 const setup = async () => {

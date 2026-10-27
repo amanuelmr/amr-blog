@@ -1,5 +1,5 @@
 const request = require('supertest');
-const app = require('../index');
+const app = require('./server');
 const User = require('../models/User');
 const { getLastOtp, registerAndVerify, registerVerifyLogin, defaultUser } = require('./helpers');
 
