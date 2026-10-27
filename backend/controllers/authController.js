@@ -17,6 +17,7 @@ const {
 
 const { getEmailTemplate } = require("../utils/emailTemplates");
 const { sendEmail, getMailerStatus } = require("../utils/mailer");
+const notify = require("../utils/notify");
 
 exports.register = async (req, res) => {
   // Input is validated by the `validate(registerSchema)` route middleware.
@@ -694,6 +695,9 @@ exports.toggleFollow = async (req, res) => {
       { _id: req.user.id },
       already ? { $pull: { following: target._id } } : { $addToSet: { following: target._id } }
     );
+    if (!already) {
+      await notify({ recipient: target._id, actor: req.user.id, type: "follow" });
+    }
     const followers = await User.countDocuments({ following: target._id });
     res.json({ following: !already, followers });
   } catch (error) {

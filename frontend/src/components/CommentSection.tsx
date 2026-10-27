@@ -193,7 +193,7 @@ export function CommentSection({ blogId, postAuthorId }: { blogId: string; postA
   }
 
   return (
-    <section className="mt-14">
+    <section id="comments" className="mt-14 scroll-mt-24">
       <h2 className="mb-6 text-xl font-semibold">
         {loading ? "Comments" : `${comments.length} comment${comments.length === 1 ? "" : "s"}`}
       </h2>

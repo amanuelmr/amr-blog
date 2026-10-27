@@ -8,6 +8,7 @@ import { ThemeToggle } from "./ThemeToggle";
 import { Avatar } from "./Avatar";
 import { LinkButton, Button } from "./ui/Button";
 import { SearchPalette } from "./SearchPalette";
+import { NotificationBell } from "./NotificationBell";
 
 function SearchIcon({ className }: { className?: string }) {
   return (
@@ -103,6 +104,7 @@ export function Header() {
           {/* Desktop actions */}
           {loading ? null : user ? (
             <>
+              <NotificationBell />
               <LinkButton href="/bookmarks" variant="ghost" size="sm" className="hidden sm:inline-flex">
                 Saved
               </LinkButton>
@@ -185,6 +187,9 @@ export function Header() {
             </Link>
             {user ? (
               <>
+                <Link href="/notifications" onClick={close} className="rule-top py-3 text-[0.95rem] text-fg">
+                  Notifications
+                </Link>
                 <Link href="/bookmarks" onClick={close} className="rule-top py-3 text-[0.95rem] text-fg">
                   Reading list
                 </Link>

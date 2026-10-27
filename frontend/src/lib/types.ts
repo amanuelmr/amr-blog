@@ -78,3 +78,13 @@ export interface Paginated<T> {
   totalPages: number;
   items: T[];
 }
+
+// GET /notifications — something that happened to the reader's work or account.
+export interface AppNotification {
+  _id: string;
+  type: "follow" | "like" | "clap" | "comment" | "reply" | "new_post";
+  actor: Author | null;
+  blog: { _id: string; title: string; slug?: string } | null;
+  read: boolean;
+  createdAt: string;
+}

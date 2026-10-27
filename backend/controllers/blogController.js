@@ -1,7 +1,9 @@
 const mongoose = require("mongoose");
 const Blog = require("../models/Blog");
+const Notification = require("../models/Notification");
 const User = require("../models/User");
 const escapeRegex = require("../utils/escapeRegex");
+const notify = require("../utils/notify");
 const getPagination = require("../utils/pagination");
 const sanitizeContent = require("../utils/sanitizeContent");
 const { makeSlug } = require("../utils/slugify");
@@ -295,6 +297,7 @@ exports.deleteBlog = async (req, res) => {
         return res.status(401).json({ msg: "User not authorized to delete this blog" });
       }
       await blog.deleteOne();
+      await Notification.deleteMany({ blog: blog._id });
   
       return res.status(200).json({ msg: "Blog deleted successfully" });
     } catch (error) {
@@ -436,6 +439,10 @@ exports.likeBlog = async (req, res) => {
     await user.save();
     await blog.save();
 
+    if (blog.likes.some((u) => u.toString() === req.user.id)) {
+      await notify({ recipient: blog.author, actor: req.user.id, type: "like", blog: blog._id });
+    }
+
     res.json(blog);
   } catch (error) {
     console.error(error.message);
@@ -537,6 +544,7 @@ exports.addComment = async (req, res) => {
     }
 
     let resolvedParent = null;
+    let parentAuthor = null;
     if (parentComment) {
       const parent = blog.comments.id(parentComment);
       if (!parent) {
@@ -545,6 +553,7 @@ exports.addComment = async (req, res) => {
       // Replies are one level deep: a reply to a reply threads under the
       // original top-level comment instead of nesting further.
       resolvedParent = parent.parentComment || parent._id;
+      parentAuthor = parent.user;
     }
 
     const newComment = {
@@ -555,6 +564,16 @@ exports.addComment = async (req, res) => {
 
     blog.comments.unshift(newComment);
     await blog.save();
+
+    // The person replied to hears about a reply; the post's author hears
+    // about everything else (once — not twice when they wrote the parent).
+    const commentId = blog.comments[0]._id;
+    if (parentAuthor) {
+      await notify({ recipient: parentAuthor, actor: req.user.id, type: "reply", blog: blog._id, comment: commentId });
+    }
+    if (!parentAuthor || parentAuthor.toString() !== blog.author.toString()) {
+      await notify({ recipient: blog.author, actor: req.user.id, type: "comment", blog: blog._id, comment: commentId });
+    }
 
     await blog.populate({ path: "comments.user", select: PUBLIC_USER_FIELDS });
 
