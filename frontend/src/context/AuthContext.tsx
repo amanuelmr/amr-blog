@@ -23,7 +23,7 @@ interface AuthContextValue {
   forgotPassword: (email: string) => Promise<void>;
   resetPassword: (email: string, otp: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
-  updateProfile: (fields: { name?: string; bio?: string }) => Promise<User>;
+  updateProfile: (fields: { name?: string; bio?: string; avatarUrl?: string | null }) => Promise<User>;
   changePassword: (oldPassword: string, newPassword: string) => Promise<void>;
 }
 
@@ -92,7 +92,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const updateProfile = useCallback(
-    async (fields: { name?: string; bio?: string }) => {
+    async (fields: { name?: string; bio?: string; avatarUrl?: string | null }) => {
       const res = await api<{ user: User }>("/auth/me", { method: "PUT", body: fields });
       persist({ ...user, ...res.user });
       return res.user;

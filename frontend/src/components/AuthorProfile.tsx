@@ -61,7 +61,7 @@ export function AuthorProfile({ id, page }: { id: string; page: number }) {
   return (
     <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
       <div className="flex items-start gap-5">
-        <Avatar name={profile.name} size={64} />
+        <Avatar name={profile.name} src={profile.avatarUrl} size={64} />
         <div className="min-w-0 flex-1">
           <h1 className="font-display text-2xl font-bold tracking-tight">{profile.name}</h1>
           <p className="mt-0.5 flex flex-wrap gap-x-3 text-sm text-muted">

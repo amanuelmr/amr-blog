@@ -619,7 +619,7 @@ exports.getPublicProfile = async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.id)) {
       return res.status(404).json({ msg: "User not found" });
     }
-    const user = await User.findById(req.params.id).select("name bio createdAt");
+    const user = await User.findById(req.params.id).select("name bio avatarUrl createdAt");
     if (!user) {
       return res.status(404).json({ msg: "User not found" });
     }
@@ -630,7 +630,7 @@ exports.getPublicProfile = async (req, res) => {
   }
 };
 
-// Update the current user's own profile (name/bio). Password changes go
+// Update the current user's own profile (name/bio/photo). Password changes go
 // through changePassword instead.
 exports.updateProfile = async (req, res) => {
   try {
@@ -640,6 +640,7 @@ exports.updateProfile = async (req, res) => {
     }
     if (req.body.name !== undefined) user.name = req.body.name;
     if (req.body.bio !== undefined) user.bio = req.body.bio;
+    if (req.body.avatarUrl !== undefined) user.avatarUrl = req.body.avatarUrl || null;
     await user.save();
 
     res.json({
@@ -647,6 +648,7 @@ exports.updateProfile = async (req, res) => {
         _id: user._id,
         name: user.name,
         bio: user.bio,
+        avatarUrl: user.avatarUrl,
         email: user.email,
         verified: user.verified,
       },

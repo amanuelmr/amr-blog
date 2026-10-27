@@ -142,7 +142,7 @@ export function CommentSection({ blogId, postAuthorId }: { blogId: string; postA
     const canDelete = mine || (!!user && !!postAuthorId && user._id === postAuthorId);
     return (
       <div className="flex gap-3">
-        <Avatar name={c.user?.name} size={isReply ? 30 : 36} />
+        <Avatar name={c.user?.name} src={c.user?.avatarUrl} size={isReply ? 30 : 36} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 text-sm">
             <span className="font-medium text-fg">{c.user?.name ?? "Unknown"}</span>

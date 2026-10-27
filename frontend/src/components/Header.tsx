@@ -117,7 +117,7 @@ export function Header() {
                 title="Account settings"
                 className="hidden items-center gap-2 rounded-md px-1.5 py-1 transition-colors hover:bg-subtle md:flex"
               >
-                <Avatar name={user.name} size={30} />
+                <Avatar name={user.name} src={user.avatarUrl} size={30} />
                 <span className="max-w-[8rem] truncate text-sm text-fg">{user.name}</span>
               </Link>
               <Button variant="ghost" size="sm" className="hidden sm:inline-flex" onClick={() => logout()}>
@@ -199,7 +199,7 @@ export function Header() {
                 </Link>
                 <div className="rule-top flex items-center justify-between gap-3 py-3">
                   <span className="flex min-w-0 items-center gap-2.5">
-                    <Avatar name={user.name} size={32} />
+                    <Avatar name={user.name} src={user.avatarUrl} size={32} />
                     <span className="truncate text-sm text-muted">{user.name}</span>
                   </span>
                   <Button

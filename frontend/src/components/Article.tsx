@@ -133,7 +133,7 @@ export function Article({ id }: { id: string }) {
         <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-2 rule-bottom pb-5 text-meta text-muted">
           {blog.author ? (
             <Link href={`/author/${blog.author._id}`} className="flex items-center gap-2.5 hover:text-fg">
-              <Avatar name={blog.author.name} size={34} />
+              <Avatar name={blog.author.name} src={blog.author.avatarUrl} size={34} />
               <span className="font-medium text-fg">{blog.author.name}</span>
             </Link>
           ) : (

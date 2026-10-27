@@ -330,7 +330,7 @@ router.post("/change-password", authMiddleware, validate(changePasswordSchema), 
  * /auth/me:
  *   put:
  *     tags: [Authentication]
- *     summary: Update the current user's profile (name/bio)
+ *     summary: Update the current user's profile (name/bio/photo)
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -344,6 +344,10 @@ router.post("/change-password", authMiddleware, validate(changePasswordSchema), 
  *               bio:
  *                 type: string
  *                 maxLength: 280
+ *               avatarUrl:
+ *                 type: string
+ *                 nullable: true
+ *                 description: Cloudinary URL of the profile photo; null removes it
  *     responses:
  *       200:
  *         description: Updated user

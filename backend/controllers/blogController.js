@@ -6,6 +6,7 @@ const getPagination = require("../utils/pagination");
 const sanitizeContent = require("../utils/sanitizeContent");
 const { makeSlug } = require("../utils/slugify");
 const { cloudinary } = require("../config/cloudinary");
+const { PUBLIC_USER_FIELDS } = require("../utils/publicUser");
 const { publicFilter, isPublished, isOwner, isVisibleTo, PUBLIC_SORT } = require("../utils/blogVisibility");
 
 // Create a blog
@@ -99,7 +100,7 @@ exports.getAllBlogs = async (req, res) => {
     const sort = req.query.sort === "popular" ? { views: -1, ...PUBLIC_SORT } : PUBLIC_SORT;
     const [blogs, total] = await Promise.all([
       Blog.find(filter)
-        .populate("author", "name")
+        .populate("author", PUBLIC_USER_FIELDS)
         .sort(sort)
         .skip(skip)
         .limit(limit),
@@ -149,9 +150,9 @@ const VIEW_WINDOW_MS = 12 * 60 * 60 * 1000;
 exports.getBlogById = async (req, res) => {
   try {
     const { id } = req.params;
-    let blog = await Blog.findOne({ slug: id }).populate("author", "name");
+    let blog = await Blog.findOne({ slug: id }).populate("author", PUBLIC_USER_FIELDS);
     if (!blog && mongoose.isValidObjectId(id)) {
-      blog = await Blog.findOne({ _id: id }).populate("author", "name");
+      blog = await Blog.findOne({ _id: id }).populate("author", PUBLIC_USER_FIELDS);
     }
 
     if (!blog || !isVisibleTo(blog, req.user)) {
@@ -340,7 +341,7 @@ exports.searchBlogs = async (req, res) => {
     const { page, limit, skip } = getPagination(req.query);
     const [blogs, total] = await Promise.all([
       Blog.find(filter)
-        .populate("author", "name")
+        .populate("author", PUBLIC_USER_FIELDS)
         .sort(PUBLIC_SORT)
         .skip(skip)
         .limit(limit),
@@ -395,7 +396,7 @@ exports.recommendBlogs = async (req, res) => {
       author: { $ne: user._id },
     };
     const [blogs, total] = await Promise.all([
-      Blog.find(filter).populate("author", "name").sort(PUBLIC_SORT).skip(skip).limit(limit),
+      Blog.find(filter).populate("author", PUBLIC_USER_FIELDS).sort(PUBLIC_SORT).skip(skip).limit(limit),
       Blog.countDocuments(filter),
     ]);
 
@@ -507,7 +508,7 @@ exports.getBookmarks = async (req, res) => {
     const { page, limit, skip } = getPagination(req.query);
     const filter = { _id: { $in: user.bookmarkedBlogs }, ...publicFilter() };
     const [blogs, total] = await Promise.all([
-      Blog.find(filter).populate("author", "name").sort(PUBLIC_SORT).skip(skip).limit(limit),
+      Blog.find(filter).populate("author", PUBLIC_USER_FIELDS).sort(PUBLIC_SORT).skip(skip).limit(limit),
       Blog.countDocuments(filter),
     ]);
 
@@ -555,7 +556,7 @@ exports.addComment = async (req, res) => {
     blog.comments.unshift(newComment);
     await blog.save();
 
-    await blog.populate({ path: "comments.user", select: "name" });
+    await blog.populate({ path: "comments.user", select: PUBLIC_USER_FIELDS });
 
     res
       .status(201)
@@ -571,7 +572,7 @@ exports.getComments = async (req, res) => {
   try {
     const blog = await Blog.findById(req.params.id).populate({
       path: "comments.user",
-      select: "name",
+      select: PUBLIC_USER_FIELDS,
     });
 
     if (!blog || !isVisibleTo(blog, req.user)) {
@@ -677,7 +678,7 @@ exports.editComment = async (req, res) => {
     // Populate before responding so every comment endpoint returns the same
     // shape ({ user: { _id, name } }). Returning a bare author id here made
     // the client lose the commenter's name when it merged the response.
-    await blog.populate({ path: "comments.user", select: "name" });
+    await blog.populate({ path: "comments.user", select: PUBLIC_USER_FIELDS });
 
     res.json({
       msg: "Comment updated successfully",
@@ -693,7 +694,8 @@ exports.editComment = async (req, res) => {
 // Cloudinary (browser → Cloudinary), keeping large files off the serverless
 // function. `type=content` targets a different folder than the cover.
 exports.uploadSignature = async (req, res) => {
-  const folder = req.query.type === "content" ? "blog-content-images" : "blog-title-images";
+  const folders = { content: "blog-content-images", avatar: "user-avatars" };
+  const folder = folders[req.query.type] || "blog-title-images";
   const timestamp = Math.round(Date.now() / 1000);
   const signature = cloudinary.utils.api_sign_request(
     { timestamp, folder },

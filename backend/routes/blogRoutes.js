@@ -137,7 +137,7 @@ router.post('/create', authMiddleware, validate(createBlogSchema), BlogControlle
  *         name: type
  *         schema:
  *           type: string
- *           enum: [cover, content]
+ *           enum: [cover, content, avatar]
  *     responses:
  *       200:
  *         description: Signature payload (cloudName, apiKey, timestamp, folder, signature)

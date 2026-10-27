@@ -196,6 +196,30 @@ describe('Auth flows', () => {
       await request(app).get('/api/v1/auth/users/not-an-id').expect(404);
     });
 
+    it('sets, shows and removes a profile photo, and puts it on bylines', async () => {
+      const agent = request.agent(app);
+      await registerVerifyLogin(agent);
+      const url = 'https://res.cloudinary.com/demo/image/upload/v1/user-avatars/me.jpg';
+
+      const set = await agent.put('/api/v1/auth/me').send({ avatarUrl: url }).expect(200);
+      expect(set.body.user.avatarUrl).toBe(url);
+      const profile = await request(app).get(`/api/v1/auth/users/${set.body.user._id}`).expect(200);
+      expect(profile.body.avatarUrl).toBe(url);
+
+      await agent.post('/api/v1/blogs/create').send({ title: 'T', content: 'C' }).expect(201);
+      const feed = await request(app).get('/api/v1/blogs').expect(200);
+      expect(feed.body.blogs[0].author.avatarUrl).toBe(url);
+
+      const cleared = await agent.put('/api/v1/auth/me').send({ avatarUrl: null }).expect(200);
+      expect(cleared.body.user.avatarUrl).toBeNull();
+    });
+
+    it('rejects a profile photo that is not a Cloudinary URL', async () => {
+      const agent = request.agent(app);
+      await registerVerifyLogin(agent);
+      await agent.put('/api/v1/auth/me').send({ avatarUrl: 'https://evil.example/x.png' }).expect(400);
+    });
+
     it('rejects a bio over 280 characters', async () => {
       const agent = request.agent(app);
       await registerVerifyLogin(agent);

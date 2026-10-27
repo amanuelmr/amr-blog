@@ -1,6 +1,7 @@
 export interface Author {
   _id: string;
   name: string;
+  avatarUrl?: string | null;
 }
 
 export interface User {
@@ -9,6 +10,7 @@ export interface User {
   email: string;
   verified: boolean;
   bio?: string;
+  avatarUrl?: string | null;
   likedBlogs?: string[];
   readBlogs?: string[];
   createdAt?: string;
@@ -21,6 +23,7 @@ export interface PublicProfile {
   _id: string;
   name: string;
   bio?: string;
+  avatarUrl?: string | null;
   createdAt: string;
 }
 

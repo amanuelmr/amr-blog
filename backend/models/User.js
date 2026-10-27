@@ -14,6 +14,12 @@ const UserSchema = new mongoose.Schema(
       maxlength: 280,
       default: "",
     },
+    // Profile photo (a Cloudinary URL uploaded straight from the browser);
+    // null means the initials avatar.
+    avatarUrl: {
+      type: String,
+      default: null,
+    },
     email: {
       type: String,
       required: [true, "Email is required"],
