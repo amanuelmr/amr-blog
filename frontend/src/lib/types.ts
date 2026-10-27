@@ -60,6 +60,10 @@ export interface Blog {
   // A "published" post with a future publishedAt is scheduled, not live yet.
   publishedAt?: string | null;
   likes: string[];
+  // Total applause, and (on a single-post read) how much of it is the
+  // requesting reader's own.
+  clapCount?: number;
+  myClaps?: number;
   // Present only when fetched by the owner/a logged-in reader (computed
   // against their own reading list — bookmarks live on User, not Blog).
   bookmarked?: boolean;

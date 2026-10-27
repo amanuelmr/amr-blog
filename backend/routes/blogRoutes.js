@@ -436,6 +436,54 @@ router.post('/:id/like', authMiddleware, BlogController.likeBlog);
 
 /**
  * @swagger
+ * /blogs/{id}/clap:
+ *   post:
+ *     summary: Applaud a published blog (adds claps, up to 50 per reader in total; also likes it)
+ *     tags: [Blogs]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               count:
+ *                 type: integer
+ *                 minimum: 1
+ *                 maximum: 50
+ *                 default: 1
+ *     responses:
+ *       200:
+ *         description: "{ clapCount: number, mine: number }"
+ *       400:
+ *         description: Invalid count, or your own post
+ *   delete:
+ *     summary: Take back all of your claps on a blog
+ *     tags: [Blogs]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: "{ clapCount: number, mine: 0 }"
+ */
+router.post('/:id/clap', authMiddleware, BlogController.clapBlog);
+router.delete('/:id/clap', authMiddleware, BlogController.unclapBlog);
+
+/**
+ * @swagger
  * /blogs/{id}/share:
  *   post:
  *     summary: Record that a published blog was shared (link copied or sent to a network)

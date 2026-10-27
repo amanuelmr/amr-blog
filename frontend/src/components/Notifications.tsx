@@ -99,7 +99,7 @@ function NotificationsInner({ page }: { page: number }) {
       ) : error ? (
         <ErrorState message={error} onRetry={load} />
       ) : !data || data.notifications.length === 0 ? (
-        <EmptyState title="Nothing yet" hint="Follows, likes, comments and replies on your writing show up here." />
+        <EmptyState title="Nothing yet" hint="Follows, applause, comments and replies on your writing show up here." />
       ) : (
         <>
           <ul className="overflow-hidden rounded-md border border-border">

@@ -217,6 +217,60 @@ describe('Blog API', () => {
     });
   });
 
+  describe('claps', () => {
+    const setup = async () => {
+      const author = request.agent(app);
+      await registerVerifyLogin(author);
+      const { body } = await createBlog(author).expect(201);
+      const reader = request.agent(app);
+      await registerVerifyLogin(reader, { email: 'reader@example.com', name: 'Reader' });
+      return { author, reader, id: body.blog._id };
+    };
+
+    it('adds claps up to 50 per reader, counts as a like, and can be taken back', async () => {
+      const { reader, id } = await setup();
+      expect((await reader.post(`/api/v1/blogs/${id}/clap`).send({ count: 3 }).expect(200)).body).toEqual({ clapCount: 3, mine: 3 });
+      expect((await reader.post(`/api/v1/blogs/${id}/clap`).send({ count: 50 }).expect(200)).body).toEqual({ clapCount: 50, mine: 50 });
+
+      const read = await reader.get(`/api/v1/blogs/${id}`).expect(200);
+      expect(read.body.myClaps).toBe(50);
+      expect(read.body.likes).toHaveLength(1);
+
+      expect((await reader.delete(`/api/v1/blogs/${id}/clap`).expect(200)).body).toEqual({ clapCount: 0, mine: 0 });
+      expect((await reader.get(`/api/v1/blogs/${id}`)).body.likes).toHaveLength(0);
+    });
+
+    it("rejects a bad count, an author's own post, and anonymous claps", async () => {
+      const { author, reader, id } = await setup();
+      await reader.post(`/api/v1/blogs/${id}/clap`).send({ count: 0 }).expect(400);
+      await reader.post(`/api/v1/blogs/${id}/clap`).send({ count: 51 }).expect(400);
+      await author.post(`/api/v1/blogs/${id}/clap`).send({ count: 1 }).expect(400);
+      await request(app).post(`/api/v1/blogs/${id}/clap`).send({ count: 1 }).expect(401);
+    });
+
+    it('keeps the legacy like toggle in step with claps', async () => {
+      const { reader, id } = await setup();
+      await reader.post(`/api/v1/blogs/${id}/clap`).send({ count: 7 }).expect(200);
+      const unliked = await reader.post(`/api/v1/blogs/${id}/like`).expect(200);
+      expect(unliked.body.clapCount).toBe(0);
+      const liked = await reader.post(`/api/v1/blogs/${id}/like`).expect(200);
+      expect(liked.body.clapCount).toBe(1);
+    });
+
+    it('backfills one clap per existing like', async () => {
+      const Blog = require('../models/Blog');
+      const backfillClaps = require('../utils/backfillClaps');
+      const { reader, id } = await setup();
+      const readerId = (await reader.post(`/api/v1/blogs/${id}/like`)).body.likes[0];
+      await Blog.updateOne({ _id: id }, { $set: { claps: [], clapCount: 0 } });
+
+      await backfillClaps();
+      const blog = await Blog.findById(id);
+      expect(blog.clapCount).toBe(1);
+      expect(blog.claps[0].user.toString()).toBe(readerId);
+    });
+  });
+
   describe('recommend', () => {
     it("suggests unread posts on the topics a reader has read, excluding their own", async () => {
       const author = request.agent(app);

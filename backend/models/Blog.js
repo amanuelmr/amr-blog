@@ -37,6 +37,15 @@ const blogSchema = new mongoose.Schema({
   status: { type: String, enum: ["draft", "published"], default: "published" },
   publishedAt: { type: Date },
   likes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], // Array to store users who liked the post
+  // Applause: each reader can clap up to MAX_CLAPS times. Anyone with claps
+  // is also in `likes` (clapping is liking, more emphatically), and
+  // clapCount is the running total, kept in step with the entries.
+  claps: [{
+    _id: false,
+    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    count: { type: Number, min: 1, max: 50, required: true },
+  }],
+  clapCount: { type: Number, default: 0 },
   shares: { type: Number, default: 0 }, // Counter for shares
   views: { type: Number, default: 0 }, // Counter for reads, bumped on each fetch by id/slug
   comments: [commentSchema] // Array of comment sub-documents

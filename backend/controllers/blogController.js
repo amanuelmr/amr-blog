@@ -203,6 +203,9 @@ exports.getBlogById = async (req, res) => {
 
     const payload = blog.toObject();
     payload.bookmarked = bookmarked;
+    payload.myClaps = req.user
+      ? blog.claps.find((c) => c.user.toString() === req.user.id.toString())?.count ?? 0
+      : 0;
     res.json(payload);
   } catch (err) {
     console.error(err.message);
@@ -424,9 +427,15 @@ exports.likeBlog = async (req, res) => {
       return res.status(404).json({ msg: "User not found" });
     }
 
+    // Kept for API compatibility alongside claps: a like is one clap, and
+    // unliking takes back all of this reader's claps.
     if (!user.likedBlogs.includes(req.params.id)) {
       user.likedBlogs.push(req.params.id);
       blog.likes.push(req.user.id);
+      if (!blog.claps.some((c) => c.user.toString() === req.user.id)) {
+        blog.claps.push({ user: req.user.id, count: 1 });
+        blog.clapCount += 1;
+      }
     } else {
       user.likedBlogs = user.likedBlogs.filter(
         (id) => id.toString() !== req.params.id
@@ -434,6 +443,11 @@ exports.likeBlog = async (req, res) => {
       blog.likes = blog.likes.filter(
         (userId) => userId.toString() !== req.user.id
       );
+      const entry = blog.claps.find((c) => c.user.toString() === req.user.id);
+      if (entry) {
+        blog.clapCount -= entry.count;
+        blog.claps = blog.claps.filter((c) => c.user.toString() !== req.user.id);
+      }
     }
 
     await user.save();
@@ -797,6 +811,73 @@ exports.getFollowingFeed = async (req, res) => {
       Blog.countDocuments(filter),
     ]);
     res.json({ blogs, total, page, limit, totalPages: Math.ceil(total / limit) });
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).send("Server error");
+  }
+};
+
+const MAX_CLAPS = 50;
+
+// Add claps (1–50 in one request, for a burst of clicks) from the current
+// reader, capped at MAX_CLAPS per reader per post. Clapping also likes the
+// post, which is what recommendations learn from.
+exports.clapBlog = async (req, res) => {
+  const add = Number(req.body.count ?? 1);
+  if (!Number.isInteger(add) || add < 1 || add > MAX_CLAPS) {
+    return res.status(400).json({ msg: `count must be a whole number from 1 to ${MAX_CLAPS}` });
+  }
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    return res.status(404).json({ msg: "Blog not found" });
+  }
+  try {
+    const blog = await Blog.findById(req.params.id);
+    if (!blog || !isPublished(blog)) {
+      return res.status(404).json({ msg: "Blog not found" });
+    }
+    if (blog.author && blog.author.toString() === req.user.id) {
+      return res.status(400).json({ msg: "You can't applaud your own post" });
+    }
+
+    const entry = blog.claps.find((c) => c.user.toString() === req.user.id);
+    const before = entry ? entry.count : 0;
+    const after = Math.min(MAX_CLAPS, before + add);
+    if (entry) entry.count = after;
+    else blog.claps.push({ user: req.user.id, count: after });
+    blog.clapCount += after - before;
+    if (!blog.likes.some((u) => u.toString() === req.user.id)) blog.likes.push(req.user.id);
+    await blog.save();
+    await User.updateOne({ _id: req.user.id }, { $addToSet: { likedBlogs: blog._id } });
+
+    if (after > before) {
+      await notify({ recipient: blog.author, actor: req.user.id, type: "clap", blog: blog._id });
+    }
+    res.json({ clapCount: blog.clapCount, mine: after });
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).send("Server error");
+  }
+};
+
+// Take back all of the current reader's claps on a post (and the like).
+exports.unclapBlog = async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    return res.status(404).json({ msg: "Blog not found" });
+  }
+  try {
+    const blog = await Blog.findById(req.params.id);
+    if (!blog) {
+      return res.status(404).json({ msg: "Blog not found" });
+    }
+    const entry = blog.claps.find((c) => c.user.toString() === req.user.id);
+    if (entry) {
+      blog.clapCount -= entry.count;
+      blog.claps = blog.claps.filter((c) => c.user.toString() !== req.user.id);
+      blog.likes = blog.likes.filter((u) => u.toString() !== req.user.id);
+      await blog.save();
+      await User.updateOne({ _id: req.user.id }, { $pull: { likedBlogs: blog._id } });
+    }
+    res.json({ clapCount: blog.clapCount, mine: 0 });
   } catch (error) {
     console.error(error.message);
     res.status(500).send("Server error");

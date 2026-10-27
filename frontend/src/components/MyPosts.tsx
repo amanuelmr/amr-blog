@@ -48,7 +48,7 @@ function PostStats({ blog }: { blog: Blog }) {
   }
   const stats = [
     count(blog.views ?? 0, "view"),
-    count(blog.likes?.length ?? 0, "like"),
+    count(blog.clapCount ?? 0, "clap"),
     count(blog.comments?.length ?? 0, "comment"),
     count(blog.shares ?? 0, "share"),
   ];

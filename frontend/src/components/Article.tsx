@@ -8,7 +8,7 @@ import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { CoverImage } from "./CoverImage";
 import { Avatar } from "./Avatar";
-import { LikeButton } from "./LikeButton";
+import { ClapButton } from "./ClapButton";
 import { BookmarkButton } from "./BookmarkButton";
 import { ShareButton } from "./ShareButton";
 import { FollowButton } from "./FollowButton";
@@ -199,7 +199,12 @@ export function Article({ id }: { id: string }) {
         </div>
 
         <div className="mt-8 flex items-center justify-center gap-3">
-          <LikeButton blogId={blog._id} initialLikes={blog.likes ?? []} />
+          <ClapButton
+            blogId={blog._id}
+            initialCount={blog.clapCount ?? 0}
+            initialMine={blog.myClaps ?? 0}
+            isOwner={isOwner}
+          />
           <BookmarkButton blogId={blog._id} initialBookmarked={blog.bookmarked ?? false} />
           {state === "live" && <ShareButton blogId={blog._id} title={blog.title} />}
         </div>
