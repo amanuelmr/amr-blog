@@ -889,3 +889,39 @@ exports.unclapBlog = async (req, res) => {
     res.status(500).send("Server error");
   }
 };
+
+// Posts the current user has opened, most recent first. readBlogs records
+// each post once, in the order first read; posts that have since gone
+// private or been deleted are left out.
+exports.getHistory = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select("readBlogs");
+    if (!user) {
+      return res.status(404).json({ msg: "User not found" });
+    }
+    const { page, limit, skip } = getPagination(req.query);
+    const live = await Blog.find({ _id: { $in: user.readBlogs }, ...publicFilter() }).select("_id");
+    const liveIds = new Set(live.map((b) => b._id.toString()));
+    const ordered = user.readBlogs.map((id) => id.toString()).filter((id) => liveIds.has(id)).reverse();
+    const pageIds = ordered.slice(skip, skip + limit);
+    const blogs = await Blog.find({ _id: { $in: pageIds } }).populate("author", PUBLIC_USER_FIELDS);
+    blogs.sort((a, b) => pageIds.indexOf(a._id.toString()) - pageIds.indexOf(b._id.toString()));
+    const total = ordered.length;
+    res.json({ blogs, total, page, limit, totalPages: Math.ceil(total / limit) });
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).send("Server error");
+  }
+};
+
+// Forget the current user's reading history. Recommendations start over too,
+// apart from what they've liked.
+exports.clearHistory = async (req, res) => {
+  try {
+    await User.updateOne({ _id: req.user.id }, { $set: { readBlogs: [] } });
+    res.json({ msg: "History cleared" });
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).send("Server error");
+  }
+};

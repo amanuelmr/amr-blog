@@ -217,6 +217,29 @@ router.get('/search', BlogController.searchBlogs);
 
 /**
  * @swagger
+ * /blogs/history:
+ *   get:
+ *     summary: Posts the current user has read, most recent first (paginated)
+ *     tags: [Blogs]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Paginated list of posts
+ *   delete:
+ *     summary: Clear the current user's reading history
+ *     tags: [Blogs]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Cleared
+ */
+router.get('/history', authMiddleware, BlogController.getHistory);
+router.delete('/history', authMiddleware, BlogController.clearHistory);
+
+/**
+ * @swagger
  * /blogs/following:
  *   get:
  *     summary: Live posts from the writers and topics the current user follows (paginated)

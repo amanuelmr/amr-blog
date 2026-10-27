@@ -9,7 +9,7 @@ import { useAuth } from "@/context/AuthContext";
 import { CoverImage } from "./CoverImage";
 import { Avatar } from "./Avatar";
 import { ClapButton } from "./ClapButton";
-import { BookmarkButton } from "./BookmarkButton";
+import { SaveMenu } from "./SaveMenu";
 import { ShareButton } from "./ShareButton";
 import { FollowButton } from "./FollowButton";
 import { CommentSection } from "./CommentSection";
@@ -205,7 +205,7 @@ export function Article({ id }: { id: string }) {
             initialMine={blog.myClaps ?? 0}
             isOwner={isOwner}
           />
-          <BookmarkButton blogId={blog._id} initialBookmarked={blog.bookmarked ?? false} />
+          {state === "live" && <SaveMenu blogId={blog._id} initialBookmarked={blog.bookmarked ?? false} />}
           {state === "live" && <ShareButton blogId={blog._id} title={blog.title} />}
         </div>
 

@@ -4,7 +4,8 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { api, ApiError } from "@/lib/api";
-import { Blog, PublicProfile } from "@/lib/types";
+import { Blog, PublicProfile, ReadingListSummary } from "@/lib/types";
+import { ListCards } from "./ListCards";
 import { Avatar } from "./Avatar";
 import { ArticleRow } from "./ArticleRow";
 import { Spinner, EmptyState, ErrorState } from "./states";
@@ -29,6 +30,13 @@ export function AuthorProfile({ id, page }: { id: string; page: number }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [followers, setFollowers] = useState<number | null>(null);
+  const [lists, setLists] = useState<ReadingListSummary[]>([]);
+
+  useEffect(() => {
+    api<{ lists: ReadingListSummary[] }>(`/lists/user/${id}`)
+      .then((res) => setLists(res.lists))
+      .catch(() => {});
+  }, [id]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -111,6 +119,13 @@ export function AuthorProfile({ id, page }: { id: string; page: number }) {
           </>
         )}
       </div>
+
+      {lists.length > 0 && (
+        <div className="mt-12 border-t border-border pt-8">
+          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted">Lists</h2>
+          <ListCards lists={lists} />
+        </div>
+      )}
 
       <div className="mt-8 text-center">
         <Link href="/" className="text-sm text-accent hover:underline">← Back to home</Link>

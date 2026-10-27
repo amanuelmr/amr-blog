@@ -191,7 +191,10 @@ export function Header() {
                   Notifications
                 </Link>
                 <Link href="/bookmarks" onClick={close} className="rule-top py-3 text-[0.95rem] text-fg">
-                  Reading list
+                  Saved
+                </Link>
+                <Link href="/history" onClick={close} className="rule-top py-3 text-[0.95rem] text-fg">
+                  Reading history
                 </Link>
                 <Link href="/write/mine" onClick={close} className="rule-top py-3 text-[0.95rem] text-fg">
                   Your posts

@@ -94,3 +94,16 @@ export interface AppNotification {
   read: boolean;
   createdAt: string;
 }
+
+// A named reading list, as listed (not its posts). `contains` is present
+// when asked about one post; `owner` when the list is fetched by id.
+export interface ReadingListSummary {
+  _id: string;
+  name: string;
+  description: string;
+  isPublic: boolean;
+  itemCount: number;
+  updatedAt: string;
+  contains?: boolean;
+  owner?: Author;
+}
