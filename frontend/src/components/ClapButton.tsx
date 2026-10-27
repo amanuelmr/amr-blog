@@ -105,8 +105,10 @@ export function ClapButton({
           mine > 0 ? "border-accent bg-accent/10 text-accent" : "border-border bg-card text-fg hover:bg-subtle"
         }`}
       >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill={mine > 0 ? "currentColor" : "none"} stroke="currentColor"
-          strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        {/* Outline only — filled, the hand reads as a blob. Applause shows
+            through the accent color instead. */}
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          strokeWidth={mine > 0 ? 2.2 : 1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M7 11.5 4.7 9.2a1.5 1.5 0 0 1 2.1-2.1l4.4 4.4" />
           <path d="m9.6 8.9-2.2-2.2a1.5 1.5 0 0 1 2.1-2.1l5.3 5.3" />
           <path d="m12.6 7.4-.8-.8a1.5 1.5 0 0 1 2.1-2.1l4.3 4.3a6 6 0 0 1 0 8.5l-.6.6a6 6 0 0 1-8.5 0L5 13.7a1.5 1.5 0 0 1 2.1-2.1l2 2" />

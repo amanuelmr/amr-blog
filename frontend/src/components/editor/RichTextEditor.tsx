@@ -4,6 +4,7 @@ import { useRef, useCallback, useState, ReactNode } from "react";
 import { useEditor, useEditorState, EditorContent, Editor, mergeAttributes, Node } from "@tiptap/react";
 import { BubbleMenu, FloatingMenu } from "@tiptap/react/menus";
 import StarterKit from "@tiptap/starter-kit";
+import { TextSelection } from "@tiptap/pm/state";
 import { Placeholder } from "@tiptap/extensions";
 import Image from "@tiptap/extension-image";
 import { uploadImage } from "@/lib/uploadImage";
@@ -314,6 +315,13 @@ export function RichTextEditor({
       {/* Selection toolbar */}
       <BubbleMenu
         editor={editor}
+        // The default rule (focused, non-empty selection), minus embeds:
+        // there's nothing to format on a video.
+        shouldShow={({ editor: ed, view, state, from, to, element }) => {
+          if (ed.isActive("embed") || !ed.isEditable || state.selection.empty) return false;
+          const emptyText = !state.doc.textBetween(from, to).length && state.selection instanceof TextSelection;
+          return !emptyText && (view.hasFocus() || element.contains(document.activeElement));
+        }}
         className="flex items-center gap-0.5 rounded-xl border border-border bg-card p-1 shadow-xl"
       >
         {imageField ? (
