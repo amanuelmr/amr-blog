@@ -42,7 +42,11 @@ export function FollowButton({
     }
     setBusy(true);
     try {
-      onFollowersChange?.(await toggleUser(userId));
+      // Not `onFollowersChange?.(await toggleUser(userId))`: an optional call
+      // skips evaluating its arguments when the callback is absent, so the
+      // toggle would never be sent from a byline.
+      const followers = await toggleUser(userId);
+      onFollowersChange?.(followers);
     } catch {
       // leave the state as it was
     } finally {
