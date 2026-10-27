@@ -16,6 +16,8 @@ const {
   updateProfile,
   toggleFollow,
   getMyFollows,
+  toggleEmailSubscription,
+  unsubscribe,
 } = wrapAll(require("../controllers/authController"));
 const authMiddleware = require("../middlewares/authMiddleware");
 const optionalAuth = require("../middlewares/optionalAuth");
@@ -416,6 +418,53 @@ router.post("/users/:id/follow", authMiddleware, toggleFollow);
  *         description: "{ users: string[], topics: string[] }"
  */
 router.get("/me/follows", authMiddleware, getMyFollows);
+
+/**
+ * @swagger
+ * /auth/users/{id}/subscribe:
+ *   post:
+ *     tags: [Authentication]
+ *     summary: Get (or stop getting) a writer's new posts by email (toggle)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: "{ subscribed: boolean }"
+ *       400:
+ *         description: Can't subscribe to yourself
+ *       404:
+ *         description: User not found
+ */
+router.post("/users/:id/subscribe", authMiddleware, toggleEmailSubscription);
+
+/**
+ * @swagger
+ * /auth/unsubscribe:
+ *   post:
+ *     tags: [Authentication]
+ *     summary: Unsubscribe from a writer's emails using the signed token from an email link (no login)
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               token:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: "{ unsubscribed: true, authorName }"
+ *       400:
+ *         description: Invalid token
+ */
+router.post("/unsubscribe", authLimiter, unsubscribe);
 
 /**
  * @swagger

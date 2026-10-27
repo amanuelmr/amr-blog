@@ -27,8 +27,10 @@ export interface PublicProfile {
   createdAt: string;
   followers: number;
   followingCount: number;
-  // Whether the requesting (signed-in) reader follows them.
+  // Whether the requesting (signed-in) reader follows them, and gets their
+  // new posts by email.
   isFollowing: boolean;
+  isSubscribed: boolean;
 }
 
 export interface Comment {

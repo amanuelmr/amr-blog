@@ -56,6 +56,9 @@ const UserSchema = new mongoose.Schema(
     // topics they follow, stored lowercase. Both feed the Following tab.
     following: { type: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }], index: true },
     followedTopics: [{ type: String }],
+    // Writers whose new posts this user gets by email (indexed: announcing a
+    // post looks up its writer's subscribers).
+    emailSubscriptions: { type: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }], index: true },
   },
   { timestamps: true }
 );

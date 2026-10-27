@@ -18,6 +18,7 @@ const {
 const { getEmailTemplate } = require("../utils/emailTemplates");
 const { sendEmail, getMailerStatus } = require("../utils/mailer");
 const notify = require("../utils/notify");
+const { verifyUnsubscribeToken } = require("../utils/unsubscribeToken");
 
 exports.register = async (req, res) => {
   // Input is validated by the `validate(registerSchema)` route middleware.
@@ -629,6 +630,9 @@ exports.getPublicProfile = async (req, res) => {
     const isFollowing = req.user
       ? (req.user.following || []).some((f) => f.toString() === user._id.toString())
       : false;
+    const isSubscribed = req.user
+      ? (req.user.emailSubscriptions || []).some((f) => f.toString() === user._id.toString())
+      : false;
     res.json({
       _id: user._id,
       name: user.name,
@@ -638,6 +642,7 @@ exports.getPublicProfile = async (req, res) => {
       followers,
       followingCount: user.following.length,
       isFollowing,
+      isSubscribed,
     });
   } catch (error) {
     console.error("Get public profile error:", error.message);
@@ -717,6 +722,49 @@ exports.getMyFollows = async (req, res) => {
     res.json({ users: user.following, topics: user.followedTopics });
   } catch (error) {
     console.error("Get follows error:", error.message);
+    res.status(500).send("Server error");
+  }
+};
+
+// Get (or stop getting) a writer's new posts by email (toggle).
+exports.toggleEmailSubscription = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(404).json({ msg: "User not found" });
+    }
+    if (id === req.user.id) {
+      return res.status(400).json({ msg: "You can't subscribe to yourself" });
+    }
+    const target = await User.findById(id).select("_id");
+    if (!target) {
+      return res.status(404).json({ msg: "User not found" });
+    }
+    const already = (req.user.emailSubscriptions || []).some((s) => s.toString() === id);
+    await User.updateOne(
+      { _id: req.user.id },
+      already ? { $pull: { emailSubscriptions: target._id } } : { $addToSet: { emailSubscriptions: target._id } }
+    );
+    res.json({ subscribed: !already });
+  } catch (error) {
+    console.error("Toggle subscription error:", error.message);
+    res.status(500).send("Server error");
+  }
+};
+
+// One-click unsubscribe from a new-post email's link — no login needed; the
+// signed token names the one subscription it ends. Idempotent.
+exports.unsubscribe = async (req, res) => {
+  const parsed = verifyUnsubscribeToken(req.body.token || "");
+  if (!parsed) {
+    return res.status(400).json({ msg: "This unsubscribe link is invalid." });
+  }
+  try {
+    await User.updateOne({ _id: parsed.subscriber }, { $pull: { emailSubscriptions: parsed.author } });
+    const author = await User.findById(parsed.author).select("name");
+    res.json({ unsubscribed: true, authorName: author ? author.name : null });
+  } catch (error) {
+    console.error("Unsubscribe error:", error.message);
     res.status(500).send("Server error");
   }
 };

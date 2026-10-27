@@ -4,6 +4,7 @@ const Notification = require("../models/Notification");
 const User = require("../models/User");
 const escapeRegex = require("../utils/escapeRegex");
 const notify = require("../utils/notify");
+const { announceDuePosts, announceDuePostsThrottled } = require("../utils/announce");
 const getPagination = require("../utils/pagination");
 const sanitizeContent = require("../utils/sanitizeContent");
 const { makeSlug } = require("../utils/slugify");
@@ -57,6 +58,9 @@ exports.createBlog = async (req, res) => {
     blog.slug = makeSlug(title, blog._id);
 
     await blog.save();
+    // Publishing now tells followers and subscribers straight away; a
+    // scheduled post is announced once its time comes (see getAllBlogs).
+    await announceDuePosts();
     
     res.status(201).json({
       success: true,
@@ -91,6 +95,7 @@ exports.createBlog = async (req, res) => {
 // ?sort=popular orders by views instead of recency.
 exports.getAllBlogs = async (req, res) => {
   try {
+    await announceDuePostsThrottled();
     const { page, limit, skip } = getPagination(req.query);
     const filter = { ...publicFilter() };
     if (req.query.author && mongoose.isValidObjectId(req.query.author)) {
@@ -273,6 +278,7 @@ exports.editBlog = async (req, res) => {
     }
 
     await blog.save();
+    await announceDuePosts(); // a draft just published, or a reschedule to now
 
     return res.status(200).json({ 
       success: true,

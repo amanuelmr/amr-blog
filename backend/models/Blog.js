@@ -36,6 +36,9 @@ const blogSchema = new mongoose.Schema({
   // "scheduled" status needed.
   status: { type: String, enum: ["draft", "published"], default: "published" },
   publishedAt: { type: Date },
+  // When followers and email subscribers were told the post went live. Set
+  // once, by utils/announce.js, so a post is never announced twice.
+  announcedAt: { type: Date, default: null },
   likes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], // Array to store users who liked the post
   // Applause: each reader can clap up to MAX_CLAPS times. Anyone with claps
   // is also in `likes` (clapping is liking, more emphatically), and

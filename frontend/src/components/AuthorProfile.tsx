@@ -10,6 +10,7 @@ import { ArticleRow } from "./ArticleRow";
 import { Spinner, EmptyState, ErrorState } from "./states";
 import { Pagination } from "./Pagination";
 import { FollowButton } from "./FollowButton";
+import { SubscribeButton } from "./SubscribeButton";
 import { formatDate } from "@/lib/format";
 
 const PAGE_SIZE = 10;
@@ -68,6 +69,7 @@ export function AuthorProfile({ id, page }: { id: string; page: number }) {
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
             <h1 className="font-display text-2xl font-bold tracking-tight">{profile.name}</h1>
             <FollowButton userId={profile._id} size="sm" onFollowersChange={setFollowers} />
+            <SubscribeButton userId={profile._id} initialSubscribed={profile.isSubscribed} />
           </div>
           <p className="mt-1 text-sm tabular-nums text-muted">
             {(followers ?? profile.followers).toLocaleString()} follower{(followers ?? profile.followers) === 1 ? "" : "s"}
