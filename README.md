@@ -1,6 +1,6 @@
 # AMR Blog
 
-A full-stack blogging platform — a REST API and a modern reading/writing client. Write articles in a distraction-free rich-text editor, publish with cover images, and browse a clean editorial feed. Authentication is email-verified (OTP) with JWT access/refresh tokens delivered as httpOnly cookies.
+A full-stack publishing platform — a REST API and a modern reading/writing client. Write in a distraction-free rich-text editor with images, captions and embeds; publish now or on a schedule; and reach readers through an editorial feed, follows, notifications, email subscriptions and RSS. Readers can clap, highlight, comment, and keep their own reading lists. Authentication is email-verified (OTP) with JWT access/refresh tokens delivered as httpOnly cookies.
 
 **Monorepo:**
 
@@ -33,7 +33,7 @@ A full-stack blogging platform — a REST API and a modern reading/writing clien
 
 **Backend:** Express, Mongoose, JSON Web Tokens, bcryptjs, `xss`, Cloudinary + Multer, Resend, Helmet, CORS, express-rate-limit, Zod validation, Swagger (swagger-jsdoc/ui-express), Jest + Supertest + mongodb-memory-server.
 
-**Frontend:** Next.js App Router, React, TypeScript, Tailwind CSS (+ Typography), Tiptap (ProseMirror), isomorphic-dompurify, Geist fonts.
+**Frontend:** Next.js App Router, React, TypeScript, Tailwind CSS (+ Typography), Tiptap (ProseMirror), isomorphic-dompurify, highlight.js, Inter + IBM Plex Mono (via `next/font`).
 
 ---
 
@@ -153,10 +153,14 @@ amr-blog/
 └── frontend/
     └── src/
         ├── app/          # App Router pages (home, blog/[id], write, write/mine,
-        │                 # bookmarks, author/[id], auth, rss.xml, sitemap.ts)
-        ├── components/   # editor, feed, article, comments, profile, UI primitives
-        ├── context/      # AuthContext
-        └── lib/          # api client, types, formatting, code highlighting, TOC
+        │                 # bookmarks, lists/[id], history, notifications,
+        │                 # author/[id], tag/[tag], settings, unsubscribe, auth,
+        │                 # rss.xml + per-author/topic feeds, sitemap.ts)
+        ├── components/   # editor, feed, article, comments, highlights, lists,
+        │                 # notifications, profile, UI primitives
+        ├── context/      # AuthContext, FollowsContext
+        └── lib/          # api client, types, formatting, code highlighting, TOC,
+                          # embeds, sanitizing, highlight marking, RSS
 ```
 
 ## License
