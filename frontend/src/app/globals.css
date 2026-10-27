@@ -329,3 +329,19 @@ body {
 .hljs-strong {
   font-weight: 600;
 }
+
+/* Highlights in a post: the reader's own, and the post's top highlight
+   (what most readers marked) in a quieter tint. */
+mark[data-hl] {
+  color: inherit;
+  border-radius: 2px;
+  padding: 0.05em 0;
+}
+mark[data-hl="mine"] {
+  background: rgb(var(--accent) / 0.22);
+  cursor: pointer;
+}
+mark[data-hl="top"] {
+  background: rgb(var(--accent) / 0.1);
+  border-bottom: 1px dashed rgb(var(--accent) / 0.6);
+}

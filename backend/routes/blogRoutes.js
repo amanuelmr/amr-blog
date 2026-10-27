@@ -44,6 +44,7 @@ const express = require('express');
 const router = express.Router();
 const { wrapAll } = require('../utils/asyncHandler');
 const BlogController = wrapAll(require('../controllers/blogController'));
+const HighlightController = wrapAll(require('../controllers/highlightController'));
 const authMiddleware = require('../middlewares/authMiddleware');
 const optionalAuth = require('../middlewares/optionalAuth');
 const validate = require('../middlewares/validate');
@@ -504,6 +505,77 @@ router.post('/:id/like', authMiddleware, BlogController.likeBlog);
  */
 router.post('/:id/clap', authMiddleware, BlogController.clapBlog);
 router.delete('/:id/clap', authMiddleware, BlogController.unclapBlog);
+
+/**
+ * @swagger
+ * /blogs/{id}/highlights:
+ *   get:
+ *     summary: Your highlights on a blog, and its top highlight (the passage most readers highlighted, once 2+ have)
+ *     tags: [Blogs]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: "{ mine: [{ _id, text }], top: { text, count } | null }"
+ *   post:
+ *     summary: Highlight a passage of a published blog (must appear in the post; up to 500 characters)
+ *     tags: [Blogs]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               text:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: "{ highlight: { _id, text } }"
+ *       400:
+ *         description: Empty, too long, or not in the post
+ */
+router.get('/:id/highlights', optionalAuth, HighlightController.getHighlights);
+router.post('/:id/highlights', authMiddleware, HighlightController.addHighlight);
+
+/**
+ * @swagger
+ * /blogs/{id}/highlights/{highlightId}:
+ *   delete:
+ *     summary: Remove one of your highlights
+ *     tags: [Blogs]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: path
+ *         name: highlightId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Removed
+ *       404:
+ *         description: Not found (or not yours)
+ */
+router.delete('/:id/highlights/:highlightId', authMiddleware, HighlightController.deleteHighlight);
 
 /**
  * @swagger

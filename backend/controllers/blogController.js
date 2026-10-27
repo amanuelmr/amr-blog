@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const Blog = require("../models/Blog");
 const Notification = require("../models/Notification");
+const Highlight = require("../models/Highlight");
 const User = require("../models/User");
 const escapeRegex = require("../utils/escapeRegex");
 const notify = require("../utils/notify");
@@ -307,6 +308,7 @@ exports.deleteBlog = async (req, res) => {
       }
       await blog.deleteOne();
       await Notification.deleteMany({ blog: blog._id });
+      await Highlight.deleteMany({ blog: blog._id });
   
       return res.status(200).json({ msg: "Blog deleted successfully" });
     } catch (error) {

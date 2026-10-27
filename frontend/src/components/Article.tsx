@@ -10,6 +10,7 @@ import { CoverImage } from "./CoverImage";
 import { Avatar } from "./Avatar";
 import { ClapButton } from "./ClapButton";
 import { SaveMenu } from "./SaveMenu";
+import { Highlights } from "./Highlights";
 import { ShareButton } from "./ShareButton";
 import { FollowButton } from "./FollowButton";
 import { CommentSection } from "./CommentSection";
@@ -185,6 +186,7 @@ export function Article({ id }: { id: string }) {
           className="prose prose-stone dark:prose-invert mt-10 max-w-none text-[1.0625rem] leading-[1.75] prose-a:text-accent prose-a:underline prose-a:decoration-accent/30 prose-a:underline-offset-2 prose-img:rounded-md"
           dangerouslySetInnerHTML={{ __html: html }}
         />
+        <Highlights contentRef={contentRef} blogId={blog._id} html={html} canHighlight={state === "live"} />
 
         <div className="mt-12 rule-top pt-8 text-center">
           <p className="label text-faint">
