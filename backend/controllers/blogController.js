@@ -733,3 +733,53 @@ exports.getMyBlogs = async (req, res) => {
     res.status(500).send("Server error");
   }
 };
+
+// Follow or unfollow a topic (toggle). Topics are stored lowercase so
+// "Go" and "go" are one topic.
+exports.toggleTopicFollow = async (req, res) => {
+  const tag = (req.params.tag || "").trim().toLowerCase();
+  if (!tag || tag.length > 60) {
+    return res.status(400).json({ msg: "Invalid topic" });
+  }
+  try {
+    const already = (req.user.followedTopics || []).includes(tag);
+    await User.updateOne(
+      { _id: req.user.id },
+      already ? { $pull: { followedTopics: tag } } : { $addToSet: { followedTopics: tag } }
+    );
+    res.json({ following: !already });
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).send("Server error");
+  }
+};
+
+// Live posts by the writers the user follows or on the topics they follow,
+// newest-published first.
+exports.getFollowingFeed = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select("following followedTopics");
+    if (!user) {
+      return res.status(404).json({ msg: "User not found" });
+    }
+    const { page, limit, skip } = getPagination(req.query);
+    const topics = (user.followedTopics || []).map((t) => new RegExp(`^${escapeRegex(t)}$`, "i"));
+    const sources = [];
+    if (user.following.length) sources.push({ author: { $in: user.following } });
+    if (topics.length) sources.push({ tags: { $in: topics } });
+    if (sources.length === 0) {
+      return res.json({ blogs: [], total: 0, page, limit, totalPages: 0 });
+    }
+
+    // $and, not a spread: publicFilter() already has its own top-level $or.
+    const filter = { $and: [publicFilter(), { $or: sources }, { author: { $ne: user._id } }] };
+    const [blogs, total] = await Promise.all([
+      Blog.find(filter).populate("author", PUBLIC_USER_FIELDS).sort(PUBLIC_SORT).skip(skip).limit(limit),
+      Blog.countDocuments(filter),
+    ]);
+    res.json({ blogs, total, page, limit, totalPages: Math.ceil(total / limit) });
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).send("Server error");
+  }
+};

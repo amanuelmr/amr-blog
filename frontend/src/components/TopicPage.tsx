@@ -7,6 +7,7 @@ import { Blog } from "@/lib/types";
 import { ArticleRow } from "./ArticleRow";
 import { Pagination } from "./Pagination";
 import { EmptyState, ErrorState, Spinner } from "./states";
+import { FollowTopicButton } from "./FollowButton";
 
 const PAGE_SIZE = 10;
 
@@ -44,7 +45,10 @@ export function TopicPage({ tag, page }: { tag: string; page: number }) {
     <div className="mx-auto max-w-3xl px-5 py-12 sm:px-6 sm:py-16">
       <header className="mb-10 rule-bottom pb-6">
         <p className="label text-muted">Topic</p>
-        <h1 className="mt-3 font-display text-[2rem] font-semibold tracking-[-0.02em] sm:text-[2.5rem]">{tag}</h1>
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+          <h1 className="font-display text-[2rem] font-semibold tracking-[-0.02em] sm:text-[2.5rem]">{tag}</h1>
+          <FollowTopicButton tag={tag} size="sm" />
+        </div>
         <div className="mt-2 flex flex-wrap items-center gap-x-3 text-muted">
           {data && (
             <span>

@@ -51,13 +51,15 @@ function FeedSkeleton() {
   );
 }
 
-export type FeedView = "latest" | "for-you";
+export type FeedView = "latest" | "following" | "for-you";
 
-// Latest / For you switch. Only for signed-in readers — recommendations come
-// from what they've read and liked.
+// Latest / Following / For you switch. Only for signed-in readers —
+// Following comes from who and what they follow, For you from what they've
+// read and liked.
 function FeedTabs({ view }: { view: FeedView }) {
   const tabs: { id: FeedView; label: string; href: string }[] = [
     { id: "latest", label: "Latest", href: "/" },
+    { id: "following", label: "Following", href: "/?view=following" },
     { id: "for-you", label: "For you", href: "/?view=for-you" },
   ];
   return (
@@ -80,8 +82,10 @@ function FeedTabs({ view }: { view: FeedView }) {
 
 export function Feed({ q, page, view }: { q: string; page: number; view: FeedView }) {
   const { user, loading: authLoading } = useAuth();
-  // Recommendations need a signed-in reader and don't mix with search.
-  const forYou = view === "for-you" && !q && !!user;
+  // Personal views need a signed-in reader and don't mix with search.
+  const personal: FeedView = !q && user ? view : "latest";
+  const forYou = personal === "for-you";
+  const following = personal === "following";
   const [data, setData] = useState<FeedResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -94,7 +98,7 @@ export function Feed({ q, page, view }: { q: string; page: number; view: FeedVie
   const fetchData = useCallback(async () => {
     // Until auth resolves we can't tell For you from Latest — wait rather
     // than load (and flash) the wrong list.
-    if (view === "for-you" && authLoading) return;
+    if (view !== "latest" && authLoading) return;
     const id = ++requestId.current;
     setLoading(true);
     setError("");
@@ -104,7 +108,9 @@ export function Feed({ q, page, view }: { q: string; page: number; view: FeedVie
         ? `/blogs/search?query=${encodeURIComponent(q)}&${params}`
         : forYou
           ? `/blogs/recommend?${params}`
-          : `/blogs?${params}`;
+          : following
+            ? `/blogs/following?${params}`
+            : `/blogs?${params}`;
       const res = await api<FeedResponse>(path);
       if (id !== requestId.current) return;
       setData(res);
@@ -114,16 +120,16 @@ export function Feed({ q, page, view }: { q: string; page: number; view: FeedVie
     } finally {
       if (id === requestId.current) setLoading(false);
     }
-  }, [q, page, forYou, view, authLoading]);
+  }, [q, page, forYou, following, view, authLoading]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
   const makeHref = (p: number) =>
-    q ? `/?q=${encodeURIComponent(q)}&page=${p}` : forYou ? `/?view=for-you&page=${p}` : `/?page=${p}`;
+    q ? `/?q=${encodeURIComponent(q)}&page=${p}` : personal !== "latest" ? `/?view=${personal}&page=${p}` : `/?page=${p}`;
 
-  const showHero = !q && page === 1 && !forYou;
+  const showHero = !q && page === 1 && personal === "latest";
   const blogs = data?.blogs ?? [];
   const listBlogs = showHero ? blogs.slice(1) : blogs;
   // Continuous numbering: page 2 starts where page 1 left off.
@@ -148,7 +154,7 @@ export function Feed({ q, page, view }: { q: string; page: number; view: FeedVie
         page === 1 && (
           <header className="mb-12">
             {/* On For you, data.total counts recommendations, not the archive. */}
-            {data && !forYou && (
+            {data && personal === "latest" && (
               <p className="mb-3 flex items-center gap-2 font-mono text-[0.6875rem] uppercase tracking-[0.14em] text-muted">
                 <span className="relative flex h-1.5 w-1.5" aria-hidden="true">
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent/60" />
@@ -172,7 +178,7 @@ export function Feed({ q, page, view }: { q: string; page: number; view: FeedVie
 
       <div className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_16rem] lg:gap-14">
         <div className="min-w-0">
-      {user && !q && <FeedTabs view={forYou ? "for-you" : "latest"} />}
+      {user && !q && <FeedTabs view={personal} />}
       {loading ? (
         <FeedSkeleton />
       ) : error ? (
@@ -182,6 +188,11 @@ export function Feed({ q, page, view }: { q: string; page: number; view: FeedVie
           <EmptyState
             title="Nothing to recommend yet"
             hint="Read or like a few pieces and you'll find more on the same topics here."
+          />
+        ) : following ? (
+          <EmptyState
+            title="Nothing from who you follow yet"
+            hint="Follow writers from their profile or a byline, or topics from a topic page, and their new pieces land here."
           />
         ) : (
           <EmptyState
@@ -200,7 +211,15 @@ export function Feed({ q, page, view }: { q: string; page: number; view: FeedVie
           {listBlogs.length > 0 && (
             <section>
               <SectionLabel>
-                {showHero ? "The Latest" : q ? "Results" : forYou ? "Picked for you" : "More stories"}
+                {showHero
+                  ? "The Latest"
+                  : q
+                    ? "Results"
+                    : forYou
+                      ? "Picked for you"
+                      : following
+                        ? "From who you follow"
+                        : "More stories"}
               </SectionLabel>
               <div>
                 {listBlogs.map((b, i) => (

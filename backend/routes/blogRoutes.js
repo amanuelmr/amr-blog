@@ -217,6 +217,44 @@ router.get('/search', BlogController.searchBlogs);
 
 /**
  * @swagger
+ * /blogs/following:
+ *   get:
+ *     summary: Live posts from the writers and topics the current user follows (paginated)
+ *     tags: [Blogs]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Paginated list of posts
+ *       401:
+ *         description: Unauthorized
+ */
+router.get('/following', authMiddleware, BlogController.getFollowingFeed);
+
+/**
+ * @swagger
+ * /blogs/topics/{tag}/follow:
+ *   post:
+ *     summary: Follow or unfollow a topic (toggle; topics are case-insensitive)
+ *     tags: [Blogs]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: tag
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: "{ following: boolean }"
+ *       401:
+ *         description: Unauthorized
+ */
+router.post('/topics/:tag/follow', authMiddleware, BlogController.toggleTopicFollow);
+
+/**
+ * @swagger
  * /blogs/topics:
  *   get:
  *     summary: Most-used tags across all live blogs, with post counts

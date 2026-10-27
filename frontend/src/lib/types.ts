@@ -25,6 +25,10 @@ export interface PublicProfile {
   bio?: string;
   avatarUrl?: string | null;
   createdAt: string;
+  followers: number;
+  followingCount: number;
+  // Whether the requesting (signed-in) reader follows them.
+  isFollowing: boolean;
 }
 
 export interface Comment {

@@ -240,6 +240,54 @@ describe('Blog API', () => {
     });
   });
 
+  describe('following', () => {
+    it('follows a writer and a topic, and the Following feed shows both', async () => {
+      const writer = request.agent(app);
+      await registerVerifyLogin(writer, { email: 'writer@example.com', name: 'Writer' });
+      await createBlog(writer, { title: 'From the writer', tags: 'css' }).expect(201);
+
+      const other = request.agent(app);
+      await registerVerifyLogin(other, { email: 'other@example.com', name: 'Other' });
+      await createBlog(other, { title: 'On a followed topic', tags: 'Go' }).expect(201);
+      await createBlog(other, { title: 'Unrelated', tags: 'rust' }).expect(201);
+
+      const reader = request.agent(app);
+      await registerVerifyLogin(reader, { email: 'reader@example.com', name: 'Reader' });
+      const empty = await reader.get('/api/v1/blogs/following').expect(200);
+      expect(empty.body.total).toBe(0);
+
+      const feed = await request(app).get('/api/v1/blogs').expect(200);
+      const writerUserId = feed.body.blogs.find((b) => b.title === 'From the writer').author._id;
+
+      const followed = await reader.post(`/api/v1/auth/users/${writerUserId}/follow`).expect(200);
+      expect(followed.body).toEqual({ following: true, followers: 1 });
+      const topic = await reader.post('/api/v1/blogs/topics/go/follow').expect(200);
+      expect(topic.body.following).toBe(true);
+
+      const mine = await reader.get('/api/v1/auth/me/follows').expect(200);
+      expect(mine.body.topics).toEqual(['go']);
+
+      const following = await reader.get('/api/v1/blogs/following').expect(200);
+      expect(following.body.blogs.map((b) => b.title).sort()).toEqual(['From the writer', 'On a followed topic']);
+
+      const profile = await reader.get(`/api/v1/auth/users/${writerUserId}`).expect(200);
+      expect(profile.body.followers).toBe(1);
+      expect(profile.body.isFollowing).toBe(true);
+
+      const unfollowed = await reader.post(`/api/v1/auth/users/${writerUserId}/follow`).expect(200);
+      expect(unfollowed.body).toEqual({ following: false, followers: 0 });
+    });
+
+    it("can't follow yourself, and requires auth", async () => {
+      const agent = request.agent(app);
+      await registerVerifyLogin(agent);
+      const { body } = await createBlog(agent).expect(201);
+      await agent.post(`/api/v1/auth/users/${body.blog.author}/follow`).expect(400);
+      await request(app).post(`/api/v1/auth/users/${body.blog.author}/follow`).expect(401);
+      await request(app).get('/api/v1/blogs/following').expect(401);
+    });
+  });
+
   describe('share', () => {
     it('counts shares of a live post without requiring auth', async () => {
       const agent = request.agent(app);

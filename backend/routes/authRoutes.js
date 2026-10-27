@@ -14,8 +14,11 @@ const {
   debugSystemHealth,
   getPublicProfile,
   updateProfile,
+  toggleFollow,
+  getMyFollows,
 } = wrapAll(require("../controllers/authController"));
 const authMiddleware = require("../middlewares/authMiddleware");
+const optionalAuth = require("../middlewares/optionalAuth");
 const validate = require("../middlewares/validate");
 const { authLimiter } = require("../middlewares/rateLimiters");
 const {
@@ -361,7 +364,7 @@ router.put("/me", authMiddleware, validate(updateProfileSchema), updateProfile);
  * /auth/users/{id}:
  *   get:
  *     tags: [Authentication]
- *     summary: Get a user's public profile (name, bio, join date — never email or auth fields)
+ *     summary: Get a user's public profile (name, bio, photo, join date, follower/following counts, and whether you follow them — never email or auth fields)
  *     parameters:
  *       - in: path
  *         name: id
@@ -374,7 +377,45 @@ router.put("/me", authMiddleware, validate(updateProfileSchema), updateProfile);
  *       404:
  *         description: User not found
  */
-router.get("/users/:id", getPublicProfile);
+router.get("/users/:id", optionalAuth, getPublicProfile);
+
+/**
+ * @swagger
+ * /auth/users/{id}/follow:
+ *   post:
+ *     tags: [Authentication]
+ *     summary: Follow or unfollow a writer (toggle)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: "{ following: boolean, followers: number }"
+ *       400:
+ *         description: Can't follow yourself
+ *       404:
+ *         description: User not found
+ */
+router.post("/users/:id/follow", authMiddleware, toggleFollow);
+
+/**
+ * @swagger
+ * /auth/me/follows:
+ *   get:
+ *     tags: [Authentication]
+ *     summary: Writer ids and topics the current user follows
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: "{ users: string[], topics: string[] }"
+ */
+router.get("/me/follows", authMiddleware, getMyFollows);
 
 /**
  * @swagger

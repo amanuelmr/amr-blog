@@ -7,7 +7,8 @@ export default function Home({
 }) {
   const q = (searchParams.q ?? "").trim();
   const page = Math.max(1, Number(searchParams.page) || 1);
-  const view = searchParams.view === "for-you" ? "for-you" : "latest";
+  const view =
+    searchParams.view === "for-you" || searchParams.view === "following" ? searchParams.view : "latest";
   // key forces a clean remount when the query/page/view changes
   return <Feed key={`${q}::${page}::${view}`} q={q} page={page} view={view} />;
 }

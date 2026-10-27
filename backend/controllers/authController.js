@@ -619,11 +619,25 @@ exports.getPublicProfile = async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.id)) {
       return res.status(404).json({ msg: "User not found" });
     }
-    const user = await User.findById(req.params.id).select("name bio avatarUrl createdAt");
+    const user = await User.findById(req.params.id).select("name bio avatarUrl createdAt following");
     if (!user) {
       return res.status(404).json({ msg: "User not found" });
     }
-    res.json(user);
+    // Counts, never the lists themselves: who follows whom isn't public.
+    const followers = await User.countDocuments({ following: user._id });
+    const isFollowing = req.user
+      ? (req.user.following || []).some((f) => f.toString() === user._id.toString())
+      : false;
+    res.json({
+      _id: user._id,
+      name: user.name,
+      bio: user.bio,
+      avatarUrl: user.avatarUrl,
+      createdAt: user.createdAt,
+      followers,
+      followingCount: user.following.length,
+      isFollowing,
+    });
   } catch (error) {
     console.error("Get public profile error:", error.message);
     res.status(500).send("Server error");
@@ -655,6 +669,50 @@ exports.updateProfile = async (req, res) => {
     });
   } catch (error) {
     console.error("Update profile error:", error.message);
+    res.status(500).send("Server error");
+  }
+};
+
+// Follow or unfollow a writer (toggle). Returns the new state and the
+// writer's follower count.
+exports.toggleFollow = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(404).json({ msg: "User not found" });
+    }
+    if (id === req.user.id) {
+      return res.status(400).json({ msg: "You can't follow yourself" });
+    }
+    const target = await User.findById(id).select("_id");
+    if (!target) {
+      return res.status(404).json({ msg: "User not found" });
+    }
+
+    const already = (req.user.following || []).some((f) => f.toString() === id);
+    await User.updateOne(
+      { _id: req.user.id },
+      already ? { $pull: { following: target._id } } : { $addToSet: { following: target._id } }
+    );
+    const followers = await User.countDocuments({ following: target._id });
+    res.json({ following: !already, followers });
+  } catch (error) {
+    console.error("Toggle follow error:", error.message);
+    res.status(500).send("Server error");
+  }
+};
+
+// Who and what the current user follows — ids and topic names, for the
+// client to show follow state without a request per button.
+exports.getMyFollows = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select("following followedTopics");
+    if (!user) {
+      return res.status(404).json({ msg: "User not found" });
+    }
+    res.json({ users: user.following, topics: user.followedTopics });
+  } catch (error) {
+    console.error("Get follows error:", error.message);
     res.status(500).send("Server error");
   }
 };

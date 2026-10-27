@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
+import { FollowsProvider } from "@/context/FollowsContext";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 
@@ -54,12 +55,14 @@ export default function RootLayout({
       </head>
       <body className={`${inter.variable} ${plexMono.variable} font-sans antialiased`}>
         <AuthProvider>
+          <FollowsProvider>
           <a href="#main" className="skip-link">Skip to content</a>
           <div className="flex min-h-screen flex-col">
             <Header />
             <main id="main" className="flex-1">{children}</main>
             <Footer />
           </div>
+          </FollowsProvider>
         </AuthProvider>
       </body>
     </html>

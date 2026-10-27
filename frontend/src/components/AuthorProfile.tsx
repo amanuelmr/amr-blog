@@ -9,6 +9,7 @@ import { Avatar } from "./Avatar";
 import { ArticleRow } from "./ArticleRow";
 import { Spinner, EmptyState, ErrorState } from "./states";
 import { Pagination } from "./Pagination";
+import { FollowButton } from "./FollowButton";
 import { formatDate } from "@/lib/format";
 
 const PAGE_SIZE = 10;
@@ -26,6 +27,7 @@ export function AuthorProfile({ id, page }: { id: string; page: number }) {
   const [posts, setPosts] = useState<PostsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [followers, setFollowers] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -63,7 +65,15 @@ export function AuthorProfile({ id, page }: { id: string; page: number }) {
       <div className="flex items-start gap-5">
         <Avatar name={profile.name} src={profile.avatarUrl} size={64} />
         <div className="min-w-0 flex-1">
-          <h1 className="font-display text-2xl font-bold tracking-tight">{profile.name}</h1>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <h1 className="font-display text-2xl font-bold tracking-tight">{profile.name}</h1>
+            <FollowButton userId={profile._id} size="sm" onFollowersChange={setFollowers} />
+          </div>
+          <p className="mt-1 text-sm tabular-nums text-muted">
+            {(followers ?? profile.followers).toLocaleString()} follower{(followers ?? profile.followers) === 1 ? "" : "s"}
+            <span className="mx-1.5 text-faint" aria-hidden="true">·</span>
+            {profile.followingCount.toLocaleString()} following
+          </p>
           <p className="mt-0.5 flex flex-wrap gap-x-3 text-sm text-muted">
             <span>Joined {formatDate(profile.createdAt)}</span>
             <a href={`/author/${id}/rss.xml`} className="text-accent hover:underline">RSS feed</a>

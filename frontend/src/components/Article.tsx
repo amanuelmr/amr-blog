@@ -11,6 +11,7 @@ import { Avatar } from "./Avatar";
 import { LikeButton } from "./LikeButton";
 import { BookmarkButton } from "./BookmarkButton";
 import { ShareButton } from "./ShareButton";
+import { FollowButton } from "./FollowButton";
 import { CommentSection } from "./CommentSection";
 import { ContinueReading } from "./ContinueReading";
 import { TableOfContentsMobile, TableOfContentsDesktop } from "./TableOfContents";
@@ -132,10 +133,13 @@ export function Article({ id }: { id: string }) {
 
         <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-2 rule-bottom pb-5 text-meta text-muted">
           {blog.author ? (
-            <Link href={`/author/${blog.author._id}`} className="flex items-center gap-2.5 hover:text-fg">
-              <Avatar name={blog.author.name} src={blog.author.avatarUrl} size={34} />
-              <span className="font-medium text-fg">{blog.author.name}</span>
-            </Link>
+            <>
+              <Link href={`/author/${blog.author._id}`} className="flex items-center gap-2.5 hover:text-fg">
+                <Avatar name={blog.author.name} src={blog.author.avatarUrl} size={34} />
+                <span className="font-medium text-fg">{blog.author.name}</span>
+              </Link>
+              {!isOwner && <FollowButton userId={blog.author._id} size="sm" />}
+            </>
           ) : (
             <span className="flex items-center gap-2.5">
               <Avatar />
