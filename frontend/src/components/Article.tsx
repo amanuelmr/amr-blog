@@ -21,7 +21,7 @@ import { Spinner, ErrorState } from "./states";
 import { formatDate, readingTime, contentToHtml, publishState, publishedDate } from "@/lib/format";
 import { withHeadingAnchors } from "@/lib/toc";
 import { enhanceCodeBlocks } from "@/lib/codeHighlight";
-import DOMPurify from "isomorphic-dompurify";
+import { sanitizeArticleHtml } from "@/lib/sanitizeArticle";
 
 export function Article({ id }: { id: string }) {
   const { user } = useAuth();
@@ -37,7 +37,7 @@ export function Article({ id }: { id: string }) {
   // as defense-in-depth before injecting it into the DOM.
   const { html, headings } = useMemo(() => {
     if (!blog) return { html: "", headings: [] };
-    const sanitized = DOMPurify.sanitize(contentToHtml(blog.content));
+    const sanitized = sanitizeArticleHtml(contentToHtml(blog.content));
     return withHeadingAnchors(sanitized);
   }, [blog]);
 

@@ -38,6 +38,40 @@ describe("sanitizeContent (stored-XSS gate)", () => {
     expect(out).toContain('src="https://res.cloudinary.com/x.png"');
   });
 
+  it("keeps an embed from an allowed provider", () => {
+    const html =
+      '<iframe src="https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ" title="Video" allowfullscreen="true"></iframe>';
+    expect(sanitizeContent(html)).toBe(html);
+    for (const src of [
+      "https://player.vimeo.com/video/76979871",
+      "https://codepen.io/someone/embed/abcDEF?default-tab=result",
+      "https://codesandbox.io/embed/new-sandbox-x1y2z",
+    ]) {
+      expect(sanitizeContent(`<iframe src="${src}"></iframe>`)).toContain(`src="${src}"`);
+    }
+  });
+
+  it("removes every other iframe entirely", () => {
+    for (const src of [
+      "https://evil.example/embed/x",
+      "https://www.youtube-nocookie.com.evil.example/embed/dQw4w9WgXcQ",
+      "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ/../../x",
+      "javascript:alert(1)",
+      "data:text/html,<script>alert(1)</script>",
+    ]) {
+      const out = sanitizeContent(`<p>a</p><iframe src="${src}">fallback</iframe><p>b</p>`);
+      expect(out).toBe("<p>a</p><p>b</p>");
+    }
+    expect(sanitizeContent("<iframe srcdoc='<script>alert(1)</script>'></iframe>")).toBe("");
+  });
+
+  it("drops event handlers and unknown attributes on an allowed embed", () => {
+    const out = sanitizeContent(
+      '<iframe src="https://player.vimeo.com/video/1" onload="steal()" srcdoc="x" style="x"></iframe>'
+    );
+    expect(out).toBe('<iframe src="https://player.vimeo.com/video/1"></iframe>');
+  });
+
   it("returns an empty string for non-string input", () => {
     expect(sanitizeContent(undefined)).toBe("");
     expect(sanitizeContent(null)).toBe("");

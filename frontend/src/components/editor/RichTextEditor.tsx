@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useCallback, useState, ReactNode } from "react";
-import { useEditor, useEditorState, EditorContent, Editor, mergeAttributes } from "@tiptap/react";
+import { useEditor, useEditorState, EditorContent, Editor, mergeAttributes, Node } from "@tiptap/react";
 import { BubbleMenu, FloatingMenu } from "@tiptap/react/menus";
 import StarterKit from "@tiptap/starter-kit";
 import { Placeholder } from "@tiptap/extensions";
@@ -9,9 +9,10 @@ import Image from "@tiptap/extension-image";
 import { uploadImage } from "@/lib/uploadImage";
 import { imageFileError } from "@/lib/imageFile";
 import { ApiError } from "@/lib/api";
+import { EMBED_PROVIDERS, isAllowedEmbedSrc, toEmbed } from "@/lib/embeds";
 import {
   BoldIcon, ItalicIcon, CodeIcon, LinkIcon, H2Icon, H3Icon, QuoteIcon,
-  BulletListIcon, OrderedListIcon, ImageIcon, DividerIcon, CheckIcon, TrashIcon,
+  BulletListIcon, OrderedListIcon, ImageIcon, DividerIcon, CheckIcon, TrashIcon, EmbedIcon,
 } from "./EditorIcons";
 
 // An image that carries its own alt text and an optional caption. With a
@@ -46,6 +47,36 @@ const CaptionedImage = Image.extend({
   renderHTML({ node, HTMLAttributes }) {
     const img = ["img", mergeAttributes(this.options.HTMLAttributes, HTMLAttributes)] as const;
     return node.attrs.caption ? ["figure", {}, img, ["figcaption", {}, node.attrs.caption]] : img;
+  },
+});
+
+// A video, pen or sandbox embedded as an iframe. Only allowlisted embed
+// URLs parse or insert (see lib/embeds.ts); the server and the renderer
+// enforce the same list.
+const Embed = Node.create({
+  name: "embed",
+  group: "block",
+  atom: true,
+  draggable: true,
+  addAttributes() {
+    return {
+      src: { default: null },
+      title: { default: "Embedded content" },
+    };
+  },
+  parseHTML() {
+    return [
+      {
+        tag: "iframe[src]",
+        getAttrs: (el) => {
+          const src = (el as HTMLElement).getAttribute("src");
+          return isAllowedEmbedSrc(src) ? { src, title: (el as HTMLElement).getAttribute("title") } : false;
+        },
+      },
+    ];
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ["iframe", mergeAttributes({ allowfullscreen: "true" }, HTMLAttributes)];
   },
 });
 
@@ -98,6 +129,9 @@ export function RichTextEditor({
   const [linkValue, setLinkValue] = useState("");
   const [imageField, setImageField] = useState<ImageField | null>(null);
   const [imageValue, setImageValue] = useState("");
+  const [embedMode, setEmbedMode] = useState(false);
+  const [embedValue, setEmbedValue] = useState("");
+  const [embedError, setEmbedError] = useState("");
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
 
@@ -136,6 +170,7 @@ export function RichTextEditor({
       }),
       Placeholder.configure({ placeholder: "Tell your story…" }),
       CaptionedImage.configure({ HTMLAttributes: { class: "rounded-xl" } }),
+      Embed,
     ],
     content: value || "",
     editorProps: {
@@ -236,6 +271,19 @@ export function RichTextEditor({
         : null,
   }) ?? NOTHING_SELECTED;
 
+  const insertEmbed = () => {
+    if (!editor) return;
+    const embed = toEmbed(embedValue);
+    if (!embed) {
+      setEmbedError(`Paste a link to a ${EMBED_PROVIDERS} page.`);
+      return;
+    }
+    editor.chain().focus().insertContent({ type: "embed", attrs: embed }).run();
+    setEmbedMode(false);
+    setEmbedValue("");
+    setEmbedError("");
+  };
+
   if (!editor) {
     return <div className="min-h-[360px]" />;
   }
@@ -329,13 +377,38 @@ export function RichTextEditor({
         editor={editor}
         className="flex items-center gap-0.5 rounded-xl border border-border bg-card p-1 shadow-xl"
       >
-        <MenuButton title="Heading" onClick={() => e.chain().focus().toggleHeading({ level: 2 }).run()}><H2Icon /></MenuButton>
-        <MenuButton title="Bullet list" onClick={() => e.chain().focus().toggleBulletList().run()}><BulletListIcon /></MenuButton>
-        <MenuButton title="Numbered list" onClick={() => e.chain().focus().toggleOrderedList().run()}><OrderedListIcon /></MenuButton>
-        <MenuButton title="Quote" onClick={() => e.chain().focus().toggleBlockquote().run()}><QuoteIcon /></MenuButton>
-        <MenuButton title="Code block" onClick={() => e.chain().focus().toggleCodeBlock().run()}><CodeIcon /></MenuButton>
-        <MenuButton title="Divider" onClick={() => e.chain().focus().setHorizontalRule().run()}><DividerIcon /></MenuButton>
-        <MenuButton title="Image" onClick={() => fileRef.current?.click()}><ImageIcon /></MenuButton>
+        {embedMode ? (
+          <div className="flex items-center gap-1 px-1">
+            <input
+              autoFocus
+              value={embedValue}
+              onChange={(ev) => {
+                setEmbedValue(ev.target.value);
+                setEmbedError("");
+              }}
+              onKeyDown={(ev) => {
+                if (ev.key === "Enter") { ev.preventDefault(); insertEmbed(); }
+                if (ev.key === "Escape") { ev.preventDefault(); setEmbedMode(false); e.commands.focus(); }
+              }}
+              placeholder={`Paste a ${EMBED_PROVIDERS} link…`}
+              aria-label="Embed link"
+              className="w-72 rounded-md border border-border bg-bg px-2 py-1.5 text-sm text-fg focus:border-accent focus:outline-none"
+            />
+            <MenuButton title="Embed" onClick={insertEmbed}><CheckIcon /></MenuButton>
+            {embedError && <span className="max-w-[12rem] px-1 text-xs text-red-500">{embedError}</span>}
+          </div>
+        ) : (
+          <>
+            <MenuButton title="Heading" onClick={() => e.chain().focus().toggleHeading({ level: 2 }).run()}><H2Icon /></MenuButton>
+            <MenuButton title="Bullet list" onClick={() => e.chain().focus().toggleBulletList().run()}><BulletListIcon /></MenuButton>
+            <MenuButton title="Numbered list" onClick={() => e.chain().focus().toggleOrderedList().run()}><OrderedListIcon /></MenuButton>
+            <MenuButton title="Quote" onClick={() => e.chain().focus().toggleBlockquote().run()}><QuoteIcon /></MenuButton>
+            <MenuButton title="Code block" onClick={() => e.chain().focus().toggleCodeBlock().run()}><CodeIcon /></MenuButton>
+            <MenuButton title="Divider" onClick={() => e.chain().focus().setHorizontalRule().run()}><DividerIcon /></MenuButton>
+            <MenuButton title="Image" onClick={() => fileRef.current?.click()}><ImageIcon /></MenuButton>
+            <MenuButton title="Embed a video, pen or sandbox" onClick={() => setEmbedMode(true)}><EmbedIcon /></MenuButton>
+          </>
+        )}
       </FloatingMenu>
 
       <EditorContent editor={editor} />

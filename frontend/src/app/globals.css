@@ -345,3 +345,19 @@ mark[data-hl="top"] {
   background: rgb(var(--accent) / 0.1);
   border-bottom: 1px dashed rgb(var(--accent) / 0.6);
 }
+
+/* Embedded videos, pens and sandboxes: full measure, 16:9. */
+.prose iframe,
+.ProseMirror iframe {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  height: auto;
+  margin: 2em 0;
+  border: 1px solid rgb(var(--border));
+  border-radius: 6px;
+  background: rgb(var(--subtle));
+}
+.ProseMirror iframe.ProseMirror-selectednode {
+  outline: 2px solid rgb(var(--accent));
+}
