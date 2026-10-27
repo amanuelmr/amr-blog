@@ -165,4 +165,4 @@ amr-blog/
 
 ## License
 
-ISC © AMR Blog
+[MIT](./LICENSE) © 2026 Amanuel Mandefrow
