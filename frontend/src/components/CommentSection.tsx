@@ -29,7 +29,7 @@ function groupByThread(comments: Comment[]) {
   return { topLevel, repliesByParent };
 }
 
-export function CommentSection({ blogId }: { blogId: string }) {
+export function CommentSection({ blogId, postAuthorId }: { blogId: string; postAuthorId?: string }) {
   const { user } = useAuth();
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -138,9 +138,11 @@ export function CommentSection({ blogId }: { blogId: string }) {
 
   function CommentBody({ c, isReply }: { c: Comment; isReply: boolean }) {
     const mine = !!user && c.user?._id === user._id;
+    // A post's author can remove any comment on it, but only edit their own.
+    const canDelete = mine || (!!user && !!postAuthorId && user._id === postAuthorId);
     return (
       <div className="flex gap-3">
-        <Avatar name={c.user?.name} size={isReply ? 30 : 36} />
+        <Avatar name={c.user?.name} src={c.user?.avatarUrl} size={isReply ? 30 : 36} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 text-sm">
             <span className="font-medium text-fg">{c.user?.name ?? "Unknown"}</span>
@@ -168,20 +170,20 @@ export function CommentSection({ blogId }: { blogId: string }) {
                 </button>
               )}
               {mine && (
-                <>
-                  <button
-                    className="hover:text-fg"
-                    onClick={() => {
-                      setEditingId(c._id);
-                      setEditText(c.text);
-                    }}
-                  >
-                    Edit
-                  </button>
-                  <button className="hover:text-red-500" onClick={() => remove(c._id)}>
-                    Delete
-                  </button>
-                </>
+                <button
+                  className="hover:text-fg"
+                  onClick={() => {
+                    setEditingId(c._id);
+                    setEditText(c.text);
+                  }}
+                >
+                  Edit
+                </button>
+              )}
+              {canDelete && (
+                <button className="hover:text-red-500" onClick={() => remove(c._id)}>
+                  {mine ? "Delete" : "Remove"}
+                </button>
               )}
             </div>
           )}
@@ -191,7 +193,7 @@ export function CommentSection({ blogId }: { blogId: string }) {
   }
 
   return (
-    <section className="mt-14">
+    <section id="comments" className="mt-14 scroll-mt-24">
       <h2 className="mb-6 text-xl font-semibold">
         {loading ? "Comments" : `${comments.length} comment${comments.length === 1 ? "" : "s"}`}
       </h2>

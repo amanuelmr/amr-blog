@@ -31,8 +31,18 @@ const changePasswordSchema = z.object({
   newPassword: password,
 });
 
+// Profile photo — like a post cover, the browser uploads it to Cloudinary and
+// sends back the secure_url. null removes the photo.
+const avatarUrl = z
+  .string()
+  .url()
+  .refine((u) => /^https:\/\/res\.cloudinary\.com\//.test(u), "Invalid image URL")
+  .nullable()
+  .optional();
+
 // All fields optional: an update may touch just the bio.
 const updateProfileSchema = z.object({
+  avatarUrl,
   name: z.string().trim().min(3, "Name must be at least 3 characters").max(255).optional(),
   bio: z.string().trim().max(280, "Bio is too long (max 280 characters)").optional(),
 });

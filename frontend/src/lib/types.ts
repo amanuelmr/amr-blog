@@ -1,6 +1,7 @@
 export interface Author {
   _id: string;
   name: string;
+  avatarUrl?: string | null;
 }
 
 export interface User {
@@ -9,6 +10,7 @@ export interface User {
   email: string;
   verified: boolean;
   bio?: string;
+  avatarUrl?: string | null;
   likedBlogs?: string[];
   readBlogs?: string[];
   createdAt?: string;
@@ -21,7 +23,14 @@ export interface PublicProfile {
   _id: string;
   name: string;
   bio?: string;
+  avatarUrl?: string | null;
   createdAt: string;
+  followers: number;
+  followingCount: number;
+  // Whether the requesting (signed-in) reader follows them, and gets their
+  // new posts by email.
+  isFollowing: boolean;
+  isSubscribed: boolean;
 }
 
 export interface Comment {
@@ -36,19 +45,27 @@ export interface Comment {
 }
 
 export type BlogStatus = "draft" | "published";
+export type PostType = "essay" | "field-note";
 
 export interface Blog {
   _id: string;
   slug?: string;
   title: string;
+  // Optional one-line deck under the title.
+  subtitle?: string;
   content: string;
   titleBackgroundImageUrl?: string | null;
   author: Author | null;
   tags: string[];
+  postType?: PostType;
   status: BlogStatus;
   // A "published" post with a future publishedAt is scheduled, not live yet.
   publishedAt?: string | null;
   likes: string[];
+  // Total applause, and (on a single-post read) how much of it is the
+  // requesting reader's own.
+  clapCount?: number;
+  myClaps?: number;
   // Present only when fetched by the owner/a logged-in reader (computed
   // against their own reading list — bookmarks live on User, not Blog).
   bookmarked?: boolean;
@@ -56,6 +73,8 @@ export interface Blog {
   views: number;
   comments: Comment[];
   createdAt: string;
+  // Last time the author changed the title, body, tags or cover.
+  editedAt?: string | null;
 }
 
 export interface Paginated<T> {
@@ -64,4 +83,27 @@ export interface Paginated<T> {
   total: number;
   totalPages: number;
   items: T[];
+}
+
+// GET /notifications — something that happened to the reader's work or account.
+export interface AppNotification {
+  _id: string;
+  type: "follow" | "like" | "clap" | "comment" | "reply" | "new_post";
+  actor: Author | null;
+  blog: { _id: string; title: string; slug?: string } | null;
+  read: boolean;
+  createdAt: string;
+}
+
+// A named reading list, as listed (not its posts). `contains` is present
+// when asked about one post; `owner` when the list is fetched by id.
+export interface ReadingListSummary {
+  _id: string;
+  name: string;
+  description: string;
+  isPublic: boolean;
+  itemCount: number;
+  updatedAt: string;
+  contains?: boolean;
+  owner?: Author;
 }

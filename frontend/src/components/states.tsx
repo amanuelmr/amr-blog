@@ -32,3 +32,23 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry?: ()
     </div>
   );
 }
+
+/** A pulsing placeholder bar, for skeletons that mirror the shape of the content they stand in for. */
+export function Skeleton({ className }: { className?: string }) {
+  return <span className={`block animate-pulse rounded bg-subtle ${className ?? ""}`} aria-hidden="true" />;
+}
+
+/**
+ * A quiet, single-line failure notice for secondary content (rails, related
+ * reading) where a full boxed ErrorState would outweigh what it is reporting.
+ */
+export function InlineError({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-2 text-[0.9375rem] text-muted">
+      <span>{message}</span>
+      <button onClick={onRetry} className="font-medium text-accent hover:text-accent-hover">
+        Try again
+      </button>
+    </div>
+  );
+}

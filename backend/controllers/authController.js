@@ -17,6 +17,8 @@ const {
 
 const { getEmailTemplate } = require("../utils/emailTemplates");
 const { sendEmail, getMailerStatus } = require("../utils/mailer");
+const notify = require("../utils/notify");
+const { verifyUnsubscribeToken } = require("../utils/unsubscribeToken");
 
 exports.register = async (req, res) => {
   // Input is validated by the `validate(registerSchema)` route middleware.
@@ -619,18 +621,36 @@ exports.getPublicProfile = async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.id)) {
       return res.status(404).json({ msg: "User not found" });
     }
-    const user = await User.findById(req.params.id).select("name bio createdAt");
+    const user = await User.findById(req.params.id).select("name bio avatarUrl createdAt following");
     if (!user) {
       return res.status(404).json({ msg: "User not found" });
     }
-    res.json(user);
+    // Counts, never the lists themselves: who follows whom isn't public.
+    const followers = await User.countDocuments({ following: user._id });
+    const isFollowing = req.user
+      ? (req.user.following || []).some((f) => f.toString() === user._id.toString())
+      : false;
+    const isSubscribed = req.user
+      ? (req.user.emailSubscriptions || []).some((f) => f.toString() === user._id.toString())
+      : false;
+    res.json({
+      _id: user._id,
+      name: user.name,
+      bio: user.bio,
+      avatarUrl: user.avatarUrl,
+      createdAt: user.createdAt,
+      followers,
+      followingCount: user.following.length,
+      isFollowing,
+      isSubscribed,
+    });
   } catch (error) {
     console.error("Get public profile error:", error.message);
     res.status(500).send("Server error");
   }
 };
 
-// Update the current user's own profile (name/bio). Password changes go
+// Update the current user's own profile (name/bio/photo). Password changes go
 // through changePassword instead.
 exports.updateProfile = async (req, res) => {
   try {
@@ -640,6 +660,7 @@ exports.updateProfile = async (req, res) => {
     }
     if (req.body.name !== undefined) user.name = req.body.name;
     if (req.body.bio !== undefined) user.bio = req.body.bio;
+    if (req.body.avatarUrl !== undefined) user.avatarUrl = req.body.avatarUrl || null;
     await user.save();
 
     res.json({
@@ -647,12 +668,103 @@ exports.updateProfile = async (req, res) => {
         _id: user._id,
         name: user.name,
         bio: user.bio,
+        avatarUrl: user.avatarUrl,
         email: user.email,
         verified: user.verified,
       },
     });
   } catch (error) {
     console.error("Update profile error:", error.message);
+    res.status(500).send("Server error");
+  }
+};
+
+// Follow or unfollow a writer (toggle). Returns the new state and the
+// writer's follower count.
+exports.toggleFollow = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(404).json({ msg: "User not found" });
+    }
+    if (id === req.user.id) {
+      return res.status(400).json({ msg: "You can't follow yourself" });
+    }
+    const target = await User.findById(id).select("_id");
+    if (!target) {
+      return res.status(404).json({ msg: "User not found" });
+    }
+
+    const already = (req.user.following || []).some((f) => f.toString() === id);
+    await User.updateOne(
+      { _id: req.user.id },
+      already ? { $pull: { following: target._id } } : { $addToSet: { following: target._id } }
+    );
+    if (!already) {
+      await notify({ recipient: target._id, actor: req.user.id, type: "follow" });
+    }
+    const followers = await User.countDocuments({ following: target._id });
+    res.json({ following: !already, followers });
+  } catch (error) {
+    console.error("Toggle follow error:", error.message);
+    res.status(500).send("Server error");
+  }
+};
+
+// Who and what the current user follows — ids and topic names, for the
+// client to show follow state without a request per button.
+exports.getMyFollows = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select("following followedTopics");
+    if (!user) {
+      return res.status(404).json({ msg: "User not found" });
+    }
+    res.json({ users: user.following, topics: user.followedTopics });
+  } catch (error) {
+    console.error("Get follows error:", error.message);
+    res.status(500).send("Server error");
+  }
+};
+
+// Get (or stop getting) a writer's new posts by email (toggle).
+exports.toggleEmailSubscription = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(404).json({ msg: "User not found" });
+    }
+    if (id === req.user.id) {
+      return res.status(400).json({ msg: "You can't subscribe to yourself" });
+    }
+    const target = await User.findById(id).select("_id");
+    if (!target) {
+      return res.status(404).json({ msg: "User not found" });
+    }
+    const already = (req.user.emailSubscriptions || []).some((s) => s.toString() === id);
+    await User.updateOne(
+      { _id: req.user.id },
+      already ? { $pull: { emailSubscriptions: target._id } } : { $addToSet: { emailSubscriptions: target._id } }
+    );
+    res.json({ subscribed: !already });
+  } catch (error) {
+    console.error("Toggle subscription error:", error.message);
+    res.status(500).send("Server error");
+  }
+};
+
+// One-click unsubscribe from a new-post email's link — no login needed; the
+// signed token names the one subscription it ends. Idempotent.
+exports.unsubscribe = async (req, res) => {
+  const parsed = verifyUnsubscribeToken(req.body.token || "");
+  if (!parsed) {
+    return res.status(400).json({ msg: "This unsubscribe link is invalid." });
+  }
+  try {
+    await User.updateOne({ _id: parsed.subscriber }, { $pull: { emailSubscriptions: parsed.author } });
+    const author = await User.findById(parsed.author).select("name");
+    res.json({ unsubscribed: true, authorName: author ? author.name : null });
+  } catch (error) {
+    console.error("Unsubscribe error:", error.message);
     res.status(500).send("Server error");
   }
 };

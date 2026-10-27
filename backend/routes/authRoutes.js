@@ -14,8 +14,13 @@ const {
   debugSystemHealth,
   getPublicProfile,
   updateProfile,
+  toggleFollow,
+  getMyFollows,
+  toggleEmailSubscription,
+  unsubscribe,
 } = wrapAll(require("../controllers/authController"));
 const authMiddleware = require("../middlewares/authMiddleware");
+const optionalAuth = require("../middlewares/optionalAuth");
 const validate = require("../middlewares/validate");
 const { authLimiter } = require("../middlewares/rateLimiters");
 const {
@@ -330,7 +335,7 @@ router.post("/change-password", authMiddleware, validate(changePasswordSchema), 
  * /auth/me:
  *   put:
  *     tags: [Authentication]
- *     summary: Update the current user's profile (name/bio)
+ *     summary: Update the current user's profile (name/bio/photo)
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -344,6 +349,10 @@ router.post("/change-password", authMiddleware, validate(changePasswordSchema), 
  *               bio:
  *                 type: string
  *                 maxLength: 280
+ *               avatarUrl:
+ *                 type: string
+ *                 nullable: true
+ *                 description: Cloudinary URL of the profile photo; null removes it
  *     responses:
  *       200:
  *         description: Updated user
@@ -357,7 +366,7 @@ router.put("/me", authMiddleware, validate(updateProfileSchema), updateProfile);
  * /auth/users/{id}:
  *   get:
  *     tags: [Authentication]
- *     summary: Get a user's public profile (name, bio, join date — never email or auth fields)
+ *     summary: Get a user's public profile (name, bio, photo, join date, follower/following counts, and whether you follow them — never email or auth fields)
  *     parameters:
  *       - in: path
  *         name: id
@@ -370,7 +379,92 @@ router.put("/me", authMiddleware, validate(updateProfileSchema), updateProfile);
  *       404:
  *         description: User not found
  */
-router.get("/users/:id", getPublicProfile);
+router.get("/users/:id", optionalAuth, getPublicProfile);
+
+/**
+ * @swagger
+ * /auth/users/{id}/follow:
+ *   post:
+ *     tags: [Authentication]
+ *     summary: Follow or unfollow a writer (toggle)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: "{ following: boolean, followers: number }"
+ *       400:
+ *         description: Can't follow yourself
+ *       404:
+ *         description: User not found
+ */
+router.post("/users/:id/follow", authMiddleware, toggleFollow);
+
+/**
+ * @swagger
+ * /auth/me/follows:
+ *   get:
+ *     tags: [Authentication]
+ *     summary: Writer ids and topics the current user follows
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: "{ users: string[], topics: string[] }"
+ */
+router.get("/me/follows", authMiddleware, getMyFollows);
+
+/**
+ * @swagger
+ * /auth/users/{id}/subscribe:
+ *   post:
+ *     tags: [Authentication]
+ *     summary: Get (or stop getting) a writer's new posts by email (toggle)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: "{ subscribed: boolean }"
+ *       400:
+ *         description: Can't subscribe to yourself
+ *       404:
+ *         description: User not found
+ */
+router.post("/users/:id/subscribe", authMiddleware, toggleEmailSubscription);
+
+/**
+ * @swagger
+ * /auth/unsubscribe:
+ *   post:
+ *     tags: [Authentication]
+ *     summary: Unsubscribe from a writer's emails using the signed token from an email link (no login)
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               token:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: "{ unsubscribed: true, authorName }"
+ *       400:
+ *         description: Invalid token
+ */
+router.post("/unsubscribe", authLimiter, unsubscribe);
 
 /**
  * @swagger

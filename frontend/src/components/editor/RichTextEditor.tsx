@@ -1,18 +1,92 @@
 "use client";
 
 import { useRef, useCallback, useState, ReactNode } from "react";
-import { useEditor, EditorContent, Editor } from "@tiptap/react";
+import { useEditor, useEditorState, EditorContent, Editor, mergeAttributes, Node } from "@tiptap/react";
 import { BubbleMenu, FloatingMenu } from "@tiptap/react/menus";
 import StarterKit from "@tiptap/starter-kit";
+import { TextSelection } from "@tiptap/pm/state";
 import { Placeholder } from "@tiptap/extensions";
 import Image from "@tiptap/extension-image";
 import { uploadImage } from "@/lib/uploadImage";
 import { imageFileError } from "@/lib/imageFile";
 import { ApiError } from "@/lib/api";
+import { EMBED_PROVIDERS, isAllowedEmbedSrc, toEmbed } from "@/lib/embeds";
 import {
   BoldIcon, ItalicIcon, CodeIcon, LinkIcon, H2Icon, H3Icon, QuoteIcon,
-  BulletListIcon, OrderedListIcon, ImageIcon, DividerIcon, CheckIcon, TrashIcon,
+  BulletListIcon, OrderedListIcon, ImageIcon, DividerIcon, CheckIcon, TrashIcon, EmbedIcon,
 } from "./EditorIcons";
+
+// An image that carries its own alt text and an optional caption. With a
+// caption it renders as <figure><img><figcaption>, otherwise as a bare
+// <img>, and it parses both shapes back (the sanitizer allows figure and
+// figcaption, and img's alt). The caption is a plain-text attribute edited
+// from the bubble menu rather than editable rich content.
+const CaptionedImage = Image.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      caption: { default: null, rendered: false },
+    };
+  },
+  parseHTML() {
+    return [
+      {
+        tag: "figure",
+        getAttrs: (el) => {
+          const img = (el as HTMLElement).querySelector("img");
+          if (!img?.getAttribute("src")) return false;
+          return {
+            src: img.getAttribute("src"),
+            alt: img.getAttribute("alt"),
+            caption: (el as HTMLElement).querySelector("figcaption")?.textContent?.trim() || null,
+          };
+        },
+      },
+      { tag: "img[src]" },
+    ];
+  },
+  renderHTML({ node, HTMLAttributes }) {
+    const img = ["img", mergeAttributes(this.options.HTMLAttributes, HTMLAttributes)] as const;
+    return node.attrs.caption ? ["figure", {}, img, ["figcaption", {}, node.attrs.caption]] : img;
+  },
+});
+
+// A video, pen or sandbox embedded as an iframe. Only allowlisted embed
+// URLs parse or insert (see lib/embeds.ts); the server and the renderer
+// enforce the same list.
+const Embed = Node.create({
+  name: "embed",
+  group: "block",
+  atom: true,
+  draggable: true,
+  addAttributes() {
+    return {
+      src: { default: null },
+      title: { default: "Embedded content" },
+    };
+  },
+  parseHTML() {
+    return [
+      {
+        tag: "iframe[src]",
+        getAttrs: (el) => {
+          const src = (el as HTMLElement).getAttribute("src");
+          return isAllowedEmbedSrc(src) ? { src, title: (el as HTMLElement).getAttribute("title") } : false;
+        },
+      },
+    ];
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ["iframe", mergeAttributes({ allowfullscreen: "true" }, HTMLAttributes)];
+  },
+});
+
+type ImageField = "alt" | "caption";
+
+const NOTHING_SELECTED = {
+  image: false, alt: false, caption: false, bold: false, italic: false,
+  code: false, link: false, h2: false, h3: false, blockquote: false,
+};
 
 function MenuButton({
   onClick,
@@ -54,6 +128,11 @@ export function RichTextEditor({
   const editorRef = useRef<Editor | null>(null);
   const [linkMode, setLinkMode] = useState(false);
   const [linkValue, setLinkValue] = useState("");
+  const [imageField, setImageField] = useState<ImageField | null>(null);
+  const [imageValue, setImageValue] = useState("");
+  const [embedMode, setEmbedMode] = useState(false);
+  const [embedValue, setEmbedValue] = useState("");
+  const [embedError, setEmbedError] = useState("");
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
 
@@ -91,7 +170,8 @@ export function RichTextEditor({
         },
       }),
       Placeholder.configure({ placeholder: "Tell your story…" }),
-      Image.configure({ HTMLAttributes: { class: "rounded-xl" } }),
+      CaptionedImage.configure({ HTMLAttributes: { class: "rounded-xl" } }),
+      Embed,
     ],
     content: value || "",
     editorProps: {
@@ -153,6 +233,58 @@ export function RichTextEditor({
     setLinkMode(false);
   }, [editor]);
 
+  const openImageField = useCallback(
+    (field: ImageField) => {
+      if (!editor) return;
+      setImageValue((editor.getAttributes("image")[field] as string) || "");
+      setImageField(field);
+    },
+    [editor]
+  );
+
+  const applyImageField = useCallback(() => {
+    if (!editor || !imageField) return;
+    editor.chain().focus().updateAttributes("image", { [imageField]: imageValue.trim() || null }).run();
+    setImageField(null);
+  }, [editor, imageField, imageValue]);
+
+  // The editor doesn't re-render this component on selection changes, so
+  // anything the menus show about the current selection is read through a
+  // subscription rather than straight off the editor during render. The
+  // snapshot is null until the editor's first transaction, so `sel` falls
+  // back to nothing selected.
+  const sel = useEditorState({
+    editor,
+    selector: ({ editor: ed }) =>
+      ed
+        ? {
+            image: ed.isActive("image"),
+            alt: !!ed.getAttributes("image").alt,
+            caption: !!ed.getAttributes("image").caption,
+            bold: ed.isActive("bold"),
+            italic: ed.isActive("italic"),
+            code: ed.isActive("code"),
+            link: ed.isActive("link"),
+            h2: ed.isActive("heading", { level: 2 }),
+            h3: ed.isActive("heading", { level: 3 }),
+            blockquote: ed.isActive("blockquote"),
+          }
+        : null,
+  }) ?? NOTHING_SELECTED;
+
+  const insertEmbed = () => {
+    if (!editor) return;
+    const embed = toEmbed(embedValue);
+    if (!embed) {
+      setEmbedError(`Paste a link to a ${EMBED_PROVIDERS} page.`);
+      return;
+    }
+    editor.chain().focus().insertContent({ type: "embed", attrs: embed }).run();
+    setEmbedMode(false);
+    setEmbedValue("");
+    setEmbedError("");
+  };
+
   if (!editor) {
     return <div className="min-h-[360px]" />;
   }
@@ -180,12 +312,44 @@ export function RichTextEditor({
         </div>
       )}
 
-      {/* Selection toolbar (Medium-style) */}
+      {/* Selection toolbar */}
       <BubbleMenu
         editor={editor}
+        // The default rule (focused, non-empty selection), minus embeds:
+        // there's nothing to format on a video.
+        shouldShow={({ editor: ed, view, state, from, to, element }) => {
+          if (ed.isActive("embed") || !ed.isEditable || state.selection.empty) return false;
+          const emptyText = !state.doc.textBetween(from, to).length && state.selection instanceof TextSelection;
+          return !emptyText && (view.hasFocus() || element.contains(document.activeElement));
+        }}
         className="flex items-center gap-0.5 rounded-xl border border-border bg-card p-1 shadow-xl"
       >
-        {linkMode ? (
+        {imageField ? (
+          <div className="flex items-center gap-1 px-1">
+            <input
+              autoFocus
+              value={imageValue}
+              onChange={(ev) => setImageValue(ev.target.value)}
+              onKeyDown={(ev) => {
+                if (ev.key === "Enter") { ev.preventDefault(); applyImageField(); }
+                if (ev.key === "Escape") { ev.preventDefault(); setImageField(null); }
+              }}
+              placeholder={imageField === "alt" ? "Describe the image for screen readers…" : "Write a caption…"}
+              aria-label={imageField === "alt" ? "Alt text" : "Caption"}
+              className="w-64 rounded-md border border-border bg-bg px-2 py-1.5 text-sm text-fg focus:border-accent focus:outline-none"
+            />
+            <MenuButton title="Apply" onClick={applyImageField}><CheckIcon /></MenuButton>
+          </div>
+        ) : sel.image ? (
+          <>
+            <MenuButton title="Alt text" active={sel.alt} onClick={() => openImageField("alt")}>
+              <span className="text-xs font-semibold">ALT</span>
+            </MenuButton>
+            <MenuButton title="Caption" active={sel.caption} onClick={() => openImageField("caption")}>
+              <span className="text-xs font-semibold">Caption</span>
+            </MenuButton>
+          </>
+        ) : linkMode ? (
           <div className="flex items-center gap-1 px-1">
             <input
               autoFocus
@@ -203,31 +367,56 @@ export function RichTextEditor({
           </div>
         ) : (
           <>
-            <MenuButton title="Bold" active={e.isActive("bold")} onClick={() => e.chain().focus().toggleBold().run()}><BoldIcon /></MenuButton>
-            <MenuButton title="Italic" active={e.isActive("italic")} onClick={() => e.chain().focus().toggleItalic().run()}><ItalicIcon /></MenuButton>
-            <MenuButton title="Inline code" active={e.isActive("code")} onClick={() => e.chain().focus().toggleCode().run()}><CodeIcon /></MenuButton>
-            <MenuButton title="Link" active={e.isActive("link")} onClick={openLink}><LinkIcon /></MenuButton>
+            <MenuButton title="Bold" active={sel.bold} onClick={() => e.chain().focus().toggleBold().run()}><BoldIcon /></MenuButton>
+            <MenuButton title="Italic" active={sel.italic} onClick={() => e.chain().focus().toggleItalic().run()}><ItalicIcon /></MenuButton>
+            <MenuButton title="Inline code" active={sel.code} onClick={() => e.chain().focus().toggleCode().run()}><CodeIcon /></MenuButton>
+            <MenuButton title="Link" active={sel.link} onClick={openLink}><LinkIcon /></MenuButton>
             <Divider />
-            <MenuButton title="Heading 2" active={e.isActive("heading", { level: 2 })} onClick={() => e.chain().focus().toggleHeading({ level: 2 }).run()}><H2Icon /></MenuButton>
-            <MenuButton title="Heading 3" active={e.isActive("heading", { level: 3 })} onClick={() => e.chain().focus().toggleHeading({ level: 3 }).run()}><H3Icon /></MenuButton>
-            <MenuButton title="Quote" active={e.isActive("blockquote")} onClick={() => e.chain().focus().toggleBlockquote().run()}><QuoteIcon /></MenuButton>
+            <MenuButton title="Heading 2" active={sel.h2} onClick={() => e.chain().focus().toggleHeading({ level: 2 }).run()}><H2Icon /></MenuButton>
+            <MenuButton title="Heading 3" active={sel.h3} onClick={() => e.chain().focus().toggleHeading({ level: 3 }).run()}><H3Icon /></MenuButton>
+            <MenuButton title="Quote" active={sel.blockquote} onClick={() => e.chain().focus().toggleBlockquote().run()}><QuoteIcon /></MenuButton>
             <MenuButton title="Add image" onClick={() => fileRef.current?.click()}><ImageIcon /></MenuButton>
           </>
         )}
       </BubbleMenu>
 
-      {/* Insert menu on empty lines (Medium-style "+") */}
+      {/* Insert menu on empty lines ("+") */}
       <FloatingMenu
         editor={editor}
         className="flex items-center gap-0.5 rounded-xl border border-border bg-card p-1 shadow-xl"
       >
-        <MenuButton title="Heading" onClick={() => e.chain().focus().toggleHeading({ level: 2 }).run()}><H2Icon /></MenuButton>
-        <MenuButton title="Bullet list" onClick={() => e.chain().focus().toggleBulletList().run()}><BulletListIcon /></MenuButton>
-        <MenuButton title="Numbered list" onClick={() => e.chain().focus().toggleOrderedList().run()}><OrderedListIcon /></MenuButton>
-        <MenuButton title="Quote" onClick={() => e.chain().focus().toggleBlockquote().run()}><QuoteIcon /></MenuButton>
-        <MenuButton title="Code block" onClick={() => e.chain().focus().toggleCodeBlock().run()}><CodeIcon /></MenuButton>
-        <MenuButton title="Divider" onClick={() => e.chain().focus().setHorizontalRule().run()}><DividerIcon /></MenuButton>
-        <MenuButton title="Image" onClick={() => fileRef.current?.click()}><ImageIcon /></MenuButton>
+        {embedMode ? (
+          <div className="flex items-center gap-1 px-1">
+            <input
+              autoFocus
+              value={embedValue}
+              onChange={(ev) => {
+                setEmbedValue(ev.target.value);
+                setEmbedError("");
+              }}
+              onKeyDown={(ev) => {
+                if (ev.key === "Enter") { ev.preventDefault(); insertEmbed(); }
+                if (ev.key === "Escape") { ev.preventDefault(); setEmbedMode(false); e.commands.focus(); }
+              }}
+              placeholder={`Paste a ${EMBED_PROVIDERS} link…`}
+              aria-label="Embed link"
+              className="w-72 rounded-md border border-border bg-bg px-2 py-1.5 text-sm text-fg focus:border-accent focus:outline-none"
+            />
+            <MenuButton title="Embed" onClick={insertEmbed}><CheckIcon /></MenuButton>
+            {embedError && <span className="max-w-[12rem] px-1 text-xs text-red-500">{embedError}</span>}
+          </div>
+        ) : (
+          <>
+            <MenuButton title="Heading" onClick={() => e.chain().focus().toggleHeading({ level: 2 }).run()}><H2Icon /></MenuButton>
+            <MenuButton title="Bullet list" onClick={() => e.chain().focus().toggleBulletList().run()}><BulletListIcon /></MenuButton>
+            <MenuButton title="Numbered list" onClick={() => e.chain().focus().toggleOrderedList().run()}><OrderedListIcon /></MenuButton>
+            <MenuButton title="Quote" onClick={() => e.chain().focus().toggleBlockquote().run()}><QuoteIcon /></MenuButton>
+            <MenuButton title="Code block" onClick={() => e.chain().focus().toggleCodeBlock().run()}><CodeIcon /></MenuButton>
+            <MenuButton title="Divider" onClick={() => e.chain().focus().setHorizontalRule().run()}><DividerIcon /></MenuButton>
+            <MenuButton title="Image" onClick={() => fileRef.current?.click()}><ImageIcon /></MenuButton>
+            <MenuButton title="Embed a video, pen or sandbox" onClick={() => setEmbedMode(true)}><EmbedIcon /></MenuButton>
+          </>
+        )}
       </FloatingMenu>
 
       <EditorContent editor={editor} />

@@ -28,4 +28,10 @@ function isVisibleTo(blog, user) {
   return isPublished(blog) || isOwner(blog, user);
 }
 
-module.exports = { publicFilter, isPublished, isOwner, isVisibleTo };
+// Public lists read newest-published first: a post scheduled weeks after it
+// was drafted belongs at the top on the day it goes live, not where its
+// creation date would put it. createdAt breaks ties (and orders any legacy
+// post that predates publishedAt — see backfillPublishedAt).
+const PUBLIC_SORT = { publishedAt: -1, createdAt: -1 };
+
+module.exports = { publicFilter, isPublished, isOwner, isVisibleTo, PUBLIC_SORT };

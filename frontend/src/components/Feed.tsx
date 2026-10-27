@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
+import Link from "next/link";
+import { useAuth } from "@/context/AuthContext";
 import { Blog } from "@/lib/types";
 import { api, ApiError } from "@/lib/api";
 import { FeaturedLead } from "./FeaturedLead";
 import { ArticleRow } from "./ArticleRow";
 import { Pagination } from "./Pagination";
 import { SideRail } from "./SideRail";
-import { Spinner, EmptyState, ErrorState } from "./states";
+import { EmptyState, ErrorState, Skeleton } from "./states";
 
 const PAGE_SIZE = 9;
 
@@ -27,36 +29,107 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function Feed({ q, page }: { q: string; page: number }) {
+/** Mirrors the row list's shape so the page doesn't jump once real rows arrive. */
+function FeedSkeleton() {
+  return (
+    <div aria-hidden="true">
+      <SectionLabel>Latest writing</SectionLabel>
+      <div>
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="grid grid-cols-[2rem_1fr] gap-x-4 gap-y-2 border-t border-rule py-6 sm:grid-cols-[2.5rem_1fr_auto] sm:gap-x-6">
+            <Skeleton className="h-3 w-5" />
+            <div className="min-w-0">
+              <Skeleton className="h-5 w-full max-w-md" />
+              <Skeleton className="mt-2.5 h-3.5 w-full max-w-lg" />
+              <Skeleton className="mt-1.5 h-3.5 w-2/3 max-w-sm" />
+              <Skeleton className="mt-3 h-2.5 w-24" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export type FeedView = "latest" | "following" | "for-you";
+
+// Latest / Following / For you switch. Only for signed-in readers —
+// Following comes from who and what they follow, For you from what they've
+// read and liked.
+function FeedTabs({ view }: { view: FeedView }) {
+  const tabs: { id: FeedView; label: string; href: string }[] = [
+    { id: "latest", label: "Latest", href: "/" },
+    { id: "following", label: "Following", href: "/?view=following" },
+    { id: "for-you", label: "For you", href: "/?view=for-you" },
+  ];
+  return (
+    <nav aria-label="Feed" className="mb-8 flex gap-6 border-b border-rule">
+      {tabs.map((t) => (
+        <Link
+          key={t.id}
+          href={t.href}
+          aria-current={view === t.id ? "page" : undefined}
+          className={`-mb-px border-b-2 pb-3 text-sm font-medium transition-colors ${
+            view === t.id ? "border-accent text-fg" : "border-transparent text-muted hover:text-fg"
+          }`}
+        >
+          {t.label}
+        </Link>
+      ))}
+    </nav>
+  );
+}
+
+export function Feed({ q, page, view }: { q: string; page: number; view: FeedView }) {
+  const { user, loading: authLoading } = useAuth();
+  // Personal views need a signed-in reader and don't mix with search.
+  const personal: FeedView = !q && user ? view : "latest";
+  const forYou = personal === "for-you";
+  const following = personal === "following";
   const [data, setData] = useState<FeedResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // Which request is current. Auth resolves after the first render, so
+  // the feed can fire twice (signed-out, then signed-in); only the latest
+  // request's response may land, or a slow earlier one would overwrite it.
+  const requestId = useRef(0);
+
   const fetchData = useCallback(async () => {
+    // Until auth resolves we can't tell For you from Latest — wait rather
+    // than load (and flash) the wrong list.
+    if (view !== "latest" && authLoading) return;
+    const id = ++requestId.current;
     setLoading(true);
     setError("");
     try {
       const params = new URLSearchParams({ page: String(page), limit: String(PAGE_SIZE) });
       const path = q
         ? `/blogs/search?query=${encodeURIComponent(q)}&${params}`
-        : `/blogs?${params}`;
+        : forYou
+          ? `/blogs/recommend?${params}`
+          : following
+            ? `/blogs/following?${params}`
+            : `/blogs?${params}`;
       const res = await api<FeedResponse>(path);
+      if (id !== requestId.current) return;
       setData(res);
     } catch (err) {
+      if (id !== requestId.current) return;
       setError(err instanceof ApiError ? err.message : "Could not load articles.");
     } finally {
-      setLoading(false);
+      if (id === requestId.current) setLoading(false);
     }
-  }, [q, page]);
+  }, [q, page, forYou, following, view, authLoading]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
   const makeHref = (p: number) =>
-    q ? `/?q=${encodeURIComponent(q)}&page=${p}` : `/?page=${p}`;
+    q ? `/?q=${encodeURIComponent(q)}&page=${p}` : personal !== "latest" ? `/?view=${personal}&page=${p}` : `/?page=${p}`;
 
-  const showHero = !q && page === 1;
+  const showHero = !q && page === 1 && personal === "latest";
   const blogs = data?.blogs ?? [];
   const listBlogs = showHero ? blogs.slice(1) : blogs;
   // Continuous numbering: page 2 starts where page 1 left off.
@@ -80,6 +153,18 @@ export function Feed({ q, page }: { q: string; page: number }) {
       ) : (
         page === 1 && (
           <header className="mb-12">
+            {/* On For you, data.total counts recommendations, not the archive. */}
+            {data && personal === "latest" && (
+              <p className="mb-3 flex items-center gap-2 font-mono text-[0.6875rem] uppercase tracking-[0.14em] text-muted">
+                <span className="relative flex h-1.5 w-1.5" aria-hidden="true">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent/60" />
+                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-accent" />
+                </span>
+                Currently building
+                <span className="text-faint" aria-hidden="true">·</span>
+                {data.total} {data.total === 1 ? "piece" : "pieces"} published
+              </p>
+            )}
             <p className="label text-accent">AMR · Journal</p>
             <h1 className="mt-4 text-balance font-display text-[2.4rem] font-semibold leading-[1.05] tracking-[-0.025em] sm:text-[3.25rem]">
               Writing on building software.
@@ -93,15 +178,28 @@ export function Feed({ q, page }: { q: string; page: number }) {
 
       <div className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_16rem] lg:gap-14">
         <div className="min-w-0">
+      {user && !q && <FeedTabs view={personal} />}
       {loading ? (
-        <Spinner label="Loading articles…" />
+        <FeedSkeleton />
       ) : error ? (
         <ErrorState message={error} onRetry={fetchData} />
       ) : blogs.length === 0 ? (
-        <EmptyState
-          title={q ? "No matching articles" : "No articles yet"}
-          hint={q ? "Try a different search term." : "Check back soon — or write the first one."}
-        />
+        forYou ? (
+          <EmptyState
+            title="Nothing to recommend yet"
+            hint="Read or like a few pieces and you'll find more on the same topics here."
+          />
+        ) : following ? (
+          <EmptyState
+            title="Nothing from who you follow yet"
+            hint="Follow writers from their profile or a byline, or topics from a topic page, and their new pieces land here."
+          />
+        ) : (
+          <EmptyState
+            title={q ? "No matching articles" : "No articles yet"}
+            hint={q ? "Try a different search term." : "Check back soon — or write the first one."}
+          />
+        )
       ) : (
         <>
           {showHero && (
@@ -112,7 +210,17 @@ export function Feed({ q, page }: { q: string; page: number }) {
 
           {listBlogs.length > 0 && (
             <section>
-              <SectionLabel>{showHero ? "The Latest" : q ? "Results" : "More stories"}</SectionLabel>
+              <SectionLabel>
+                {showHero
+                  ? "The Latest"
+                  : q
+                    ? "Results"
+                    : forYou
+                      ? "Picked for you"
+                      : following
+                        ? "From who you follow"
+                        : "More stories"}
+              </SectionLabel>
               <div>
                 {listBlogs.map((b, i) => (
                   <ArticleRow key={b._id} blog={b} index={rowOffset + i} />

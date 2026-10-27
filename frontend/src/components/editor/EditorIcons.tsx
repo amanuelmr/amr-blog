@@ -95,6 +95,13 @@ export const DividerIcon = (p: SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
+export const EmbedIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
+    <rect x="3" y="5" width="18" height="14" rx="2" />
+    <path d="m10 9 5 3-5 3z" />
+  </svg>
+);
+
 export const CheckIcon = (p: SVGProps<SVGSVGElement>) => (
   <svg {...base(p)}>
     <polyline points="20 6 9 17 4 12" />

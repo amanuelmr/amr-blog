@@ -1,5 +1,5 @@
 const request = require('supertest');
-const app = require('../index');
+const app = require('./server');
 
 describe('global error handler', () => {
   it('reports malformed JSON as 400, not a server error', async () => {

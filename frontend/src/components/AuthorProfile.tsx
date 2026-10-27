@@ -4,11 +4,14 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { api, ApiError } from "@/lib/api";
-import { Blog, PublicProfile } from "@/lib/types";
+import { Blog, PublicProfile, ReadingListSummary } from "@/lib/types";
+import { ListCards } from "./ListCards";
 import { Avatar } from "./Avatar";
 import { ArticleRow } from "./ArticleRow";
 import { Spinner, EmptyState, ErrorState } from "./states";
 import { Pagination } from "./Pagination";
+import { FollowButton } from "./FollowButton";
+import { SubscribeButton } from "./SubscribeButton";
 import { formatDate } from "@/lib/format";
 
 const PAGE_SIZE = 10;
@@ -26,6 +29,14 @@ export function AuthorProfile({ id, page }: { id: string; page: number }) {
   const [posts, setPosts] = useState<PostsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [followers, setFollowers] = useState<number | null>(null);
+  const [lists, setLists] = useState<ReadingListSummary[]>([]);
+
+  useEffect(() => {
+    api<{ lists: ReadingListSummary[] }>(`/lists/user/${id}`)
+      .then((res) => setLists(res.lists))
+      .catch(() => {});
+  }, [id]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -61,10 +72,22 @@ export function AuthorProfile({ id, page }: { id: string; page: number }) {
   return (
     <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
       <div className="flex items-start gap-5">
-        <Avatar name={profile.name} size={64} />
+        <Avatar name={profile.name} src={profile.avatarUrl} size={64} />
         <div className="min-w-0 flex-1">
-          <h1 className="font-serif text-2xl font-bold tracking-tight">{profile.name}</h1>
-          <p className="mt-0.5 text-sm text-muted">Joined {formatDate(profile.createdAt)}</p>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <h1 className="font-display text-2xl font-bold tracking-tight">{profile.name}</h1>
+            <FollowButton userId={profile._id} size="sm" onFollowersChange={setFollowers} />
+            <SubscribeButton userId={profile._id} initialSubscribed={profile.isSubscribed} />
+          </div>
+          <p className="mt-1 text-sm tabular-nums text-muted">
+            {(followers ?? profile.followers).toLocaleString()} follower{(followers ?? profile.followers) === 1 ? "" : "s"}
+            <span className="mx-1.5 text-faint" aria-hidden="true">·</span>
+            {profile.followingCount.toLocaleString()} following
+          </p>
+          <p className="mt-0.5 flex flex-wrap gap-x-3 text-sm text-muted">
+            <span>Joined {formatDate(profile.createdAt)}</span>
+            <a href={`/author/${id}/rss.xml`} className="text-accent hover:underline">RSS feed</a>
+          </p>
 
           {profile.bio ? (
             <p className="mt-3 max-w-prose text-fg/90">{profile.bio}</p>
@@ -96,6 +119,13 @@ export function AuthorProfile({ id, page }: { id: string; page: number }) {
           </>
         )}
       </div>
+
+      {lists.length > 0 && (
+        <div className="mt-12 border-t border-border pt-8">
+          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted">Lists</h2>
+          <ListCards lists={lists} />
+        </div>
+      )}
 
       <div className="mt-8 text-center">
         <Link href="/" className="text-sm text-accent hover:underline">← Back to home</Link>

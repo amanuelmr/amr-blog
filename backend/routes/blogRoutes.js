@@ -14,6 +14,10 @@
  *         title:
  *           type: string
  *           description: Blog's title
+ *         subtitle:
+ *           type: string
+ *           maxLength: 200
+ *           description: Optional one-line deck shown under the title and on cards
  *         content:
  *           type: string
  *           description: Blog's content as plain text
@@ -40,6 +44,7 @@ const express = require('express');
 const router = express.Router();
 const { wrapAll } = require('../utils/asyncHandler');
 const BlogController = wrapAll(require('../controllers/blogController'));
+const HighlightController = wrapAll(require('../controllers/highlightController'));
 const authMiddleware = require('../middlewares/authMiddleware');
 const optionalAuth = require('../middlewares/optionalAuth');
 const validate = require('../middlewares/validate');
@@ -133,7 +138,7 @@ router.post('/create', authMiddleware, validate(createBlogSchema), BlogControlle
  *         name: type
  *         schema:
  *           type: string
- *           enum: [cover, content]
+ *           enum: [cover, content, avatar]
  *     responses:
  *       200:
  *         description: Signature payload (cloudName, apiKey, timestamp, folder, signature)
@@ -146,7 +151,7 @@ router.get('/upload-signature', authMiddleware, BlogController.uploadSignature);
  * @swagger
  * /blogs/recommend:
  *   get:
- *     summary: Recommend blogs based on likes and reads
+ *     summary: Recommend unread live blogs on the topics of the user's likes and reads (paginated, excludes their own posts)
  *     tags: [Blogs]
  *     security:
  *       - bearerAuth: []
@@ -213,6 +218,86 @@ router.get('/search', BlogController.searchBlogs);
 
 /**
  * @swagger
+ * /blogs/history:
+ *   get:
+ *     summary: Posts the current user has read, most recent first (paginated)
+ *     tags: [Blogs]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Paginated list of posts
+ *   delete:
+ *     summary: Clear the current user's reading history
+ *     tags: [Blogs]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Cleared
+ */
+router.get('/history', authMiddleware, BlogController.getHistory);
+router.delete('/history', authMiddleware, BlogController.clearHistory);
+
+/**
+ * @swagger
+ * /blogs/following:
+ *   get:
+ *     summary: Live posts from the writers and topics the current user follows (paginated)
+ *     tags: [Blogs]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Paginated list of posts
+ *       401:
+ *         description: Unauthorized
+ */
+router.get('/following', authMiddleware, BlogController.getFollowingFeed);
+
+/**
+ * @swagger
+ * /blogs/topics/{tag}/follow:
+ *   post:
+ *     summary: Follow or unfollow a topic (toggle; topics are case-insensitive)
+ *     tags: [Blogs]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: tag
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: "{ following: boolean }"
+ *       401:
+ *         description: Unauthorized
+ */
+router.post('/topics/:tag/follow', authMiddleware, BlogController.toggleTopicFollow);
+
+/**
+ * @swagger
+ * /blogs/topics:
+ *   get:
+ *     summary: Most-used tags across all live blogs, with post counts
+ *     tags: [Blogs]
+ *     parameters:
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *           maximum: 50
+ *     responses:
+ *       200:
+ *         description: "{ topics: [{ tag, count }] }, most-used first"
+ */
+router.get('/topics', BlogController.getTopics);
+
+/**
+ * @swagger
  * /blogs:
  *   get:
  *     summary: Get all blogs
@@ -223,6 +308,17 @@ router.get('/search', BlogController.searchBlogs);
  *         schema:
  *           type: string
  *         description: Narrow to one author's published posts (their user id)
+ *       - in: query
+ *         name: tag
+ *         schema:
+ *           type: string
+ *         description: Narrow to posts carrying this exact tag (case-insensitive)
+ *       - in: query
+ *         name: sort
+ *         schema:
+ *           type: string
+ *           enum: [popular]
+ *         description: "popular orders by views; omit for newest-published first"
  *     responses:
  *       200:
  *         description: List of all blogs
@@ -364,6 +460,146 @@ router.post('/:id/like', authMiddleware, BlogController.likeBlog);
 
 /**
  * @swagger
+ * /blogs/{id}/clap:
+ *   post:
+ *     summary: Applaud a published blog (adds claps, up to 50 per reader in total; also likes it)
+ *     tags: [Blogs]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               count:
+ *                 type: integer
+ *                 minimum: 1
+ *                 maximum: 50
+ *                 default: 1
+ *     responses:
+ *       200:
+ *         description: "{ clapCount: number, mine: number }"
+ *       400:
+ *         description: Invalid count, or your own post
+ *   delete:
+ *     summary: Take back all of your claps on a blog
+ *     tags: [Blogs]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: "{ clapCount: number, mine: 0 }"
+ */
+router.post('/:id/clap', authMiddleware, BlogController.clapBlog);
+router.delete('/:id/clap', authMiddleware, BlogController.unclapBlog);
+
+/**
+ * @swagger
+ * /blogs/{id}/highlights:
+ *   get:
+ *     summary: Your highlights on a blog, and its top highlight (the passage most readers highlighted, once 2+ have)
+ *     tags: [Blogs]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: "{ mine: [{ _id, text }], top: { text, count } | null }"
+ *   post:
+ *     summary: Highlight a passage of a published blog (must appear in the post; up to 500 characters)
+ *     tags: [Blogs]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               text:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: "{ highlight: { _id, text } }"
+ *       400:
+ *         description: Empty, too long, or not in the post
+ */
+router.get('/:id/highlights', optionalAuth, HighlightController.getHighlights);
+router.post('/:id/highlights', authMiddleware, HighlightController.addHighlight);
+
+/**
+ * @swagger
+ * /blogs/{id}/highlights/{highlightId}:
+ *   delete:
+ *     summary: Remove one of your highlights
+ *     tags: [Blogs]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: path
+ *         name: highlightId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Removed
+ *       404:
+ *         description: Not found (or not yours)
+ */
+router.delete('/:id/highlights/:highlightId', authMiddleware, HighlightController.deleteHighlight);
+
+/**
+ * @swagger
+ * /blogs/{id}/share:
+ *   post:
+ *     summary: Record that a published blog was shared (link copied or sent to a network)
+ *     tags: [Blogs]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Blog ID
+ *     responses:
+ *       200:
+ *         description: "{ shares: number } — the new total"
+ *       404:
+ *         description: Blog not found (or not published)
+ */
+router.post('/:id/share', BlogController.shareBlog);
+
+/**
+ * @swagger
  * /blogs/{id}/bookmark:
  *   post:
  *     summary: Toggle saving a blog to the current user's reading list
@@ -446,7 +682,7 @@ router.get('/:id/comments', optionalAuth, BlogController.getComments);
  * @swagger
  * /blogs/{id}/comments/{commentId}:
  *   delete:
- *     summary: Delete a comment on a blog
+ *     summary: Delete a comment on a blog (its commenter, or the blog's author)
  *     tags: [Blogs]
  *     security:
  *       - bearerAuth: []

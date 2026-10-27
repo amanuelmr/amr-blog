@@ -1,7 +1,16 @@
 const { z } = require("zod");
 
 // Tags may arrive as an array (JSON) or a comma-separated string (form-data).
-const tags = z.union([z.array(z.string()), z.string()]).optional();
+// The editor caps tags at MAX_TAGS; enforce it here too so the API can't be
+// used to get around it.
+const MAX_TAGS = 5;
+const tooManyTags = `A post can have at most ${MAX_TAGS} tags`;
+const tags = z
+  .union([
+    z.array(z.string()).max(MAX_TAGS, tooManyTags),
+    z.string().refine((s) => s.split(",").filter((t) => t.trim()).length <= MAX_TAGS, tooManyTags),
+  ])
+  .optional();
 
 // Content is rich HTML from the editor; cap size before it reaches the
 // sanitizer/DB. min(1) rejects empty submissions (raw string).
@@ -22,6 +31,8 @@ const coverUrl = z
 // a schedule explicitly.
 const status = z.enum(["draft", "published"]).optional();
 const publishedAt = z.coerce.date().nullable().optional();
+const postType = z.enum(["essay", "field-note"]).optional();
+const subtitle = z.string().trim().max(200, "Subtitle is too long (max 200 characters)").optional();
 
 const createBlogSchema = z.object({
   title: z.string().trim().min(1, "Title is required").max(300),
@@ -30,6 +41,8 @@ const createBlogSchema = z.object({
   titleBackgroundImageUrl: coverUrl,
   status,
   publishedAt,
+  postType,
+  subtitle,
 });
 
 // All fields optional: an edit may update only the cover image without
@@ -41,6 +54,8 @@ const editBlogSchema = z.object({
   titleBackgroundImageUrl: coverUrl,
   status,
   publishedAt,
+  postType,
+  subtitle,
 });
 
 const commentSchema = z.object({

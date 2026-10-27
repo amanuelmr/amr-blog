@@ -1,19 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { Label, Input, Textarea, FieldError } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
 import { Avatar } from "@/components/Avatar";
 import { fieldErrorsFrom, formErrorFrom } from "@/lib/fieldErrors";
+import { imageFileError } from "@/lib/imageFile";
+import { uploadToCloudinary } from "@/lib/uploadToCloudinary";
 
 const BIO_MAX = 280;
 const NAME_MIN = 3;
 
 /**
- * Name and bio — the two things the API lets an author change about how they
- * appear publicly. Save stays disabled until something actually differs, so
+ * Photo, name and bio — what an author can change about how they appear
+ * publicly. The photo saves as soon as it's picked or removed; name and bio
+ * wait for Save, which stays disabled until something actually differs, so
  * the button is never a lie about whether there is work to do.
  */
 export function ProfileForm() {
@@ -24,8 +27,32 @@ export function ProfileForm() {
   const [formError, setFormError] = useState("");
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [photoError, setPhotoError] = useState("");
+  const photoRef = useRef<HTMLInputElement>(null);
 
   if (!user) return null;
+
+  async function savePhoto(file: File | null) {
+    setPhotoError("");
+    if (file) {
+      const invalid = imageFileError(file);
+      if (invalid) {
+        setPhotoError(invalid);
+        return;
+      }
+    }
+    setPhotoBusy(true);
+    try {
+      const avatarUrl = file ? await uploadToCloudinary(file, "avatar") : null;
+      await updateProfile({ avatarUrl });
+    } catch (err) {
+      setPhotoError(formErrorFrom(err, "Could not update your photo."));
+    } finally {
+      setPhotoBusy(false);
+      if (photoRef.current) photoRef.current.value = "";
+    }
+  }
 
   const trimmedName = name.trim();
   const trimmedBio = bio.trim();
@@ -58,10 +85,35 @@ export function ProfileForm() {
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-5">
       <div className="flex items-center gap-4">
-        <Avatar name={trimmedName || user.name} size={52} />
-        <p className="text-meta text-muted">
-          Your avatar is drawn from your initials, so it changes with your name.
-        </p>
+        <Avatar name={trimmedName || user.name} src={user.avatarUrl} size={52} />
+        <div className="flex flex-col gap-1.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              ref={photoRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => void savePhoto(e.target.files?.[0] ?? null)}
+            />
+            <Button type="button" size="sm" variant="ghost" loading={photoBusy} onClick={() => photoRef.current?.click()}>
+              {user.avatarUrl ? "Change photo" : "Upload photo"}
+            </Button>
+            {user.avatarUrl && !photoBusy && (
+              <Button type="button" size="sm" variant="ghost" onClick={() => void savePhoto(null)}>
+                Remove
+              </Button>
+            )}
+          </div>
+          <p className="text-meta text-muted">
+            {photoError ? (
+              <span className="text-red-500">{photoError}</span>
+            ) : user.avatarUrl ? (
+              "Shown on your posts, comments and profile."
+            ) : (
+              "Without a photo, your avatar is drawn from your initials."
+            )}
+          </p>
+        </div>
       </div>
 
       <div>

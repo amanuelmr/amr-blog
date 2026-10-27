@@ -16,17 +16,39 @@ const blogSchema = new mongoose.Schema({
   // URL-friendly identifier (e.g. "the-quiet-architecture-9f3a1c"). Sparse so
   // pre-existing documents without a slug don't collide on the unique index.
   slug: { type: String, unique: true, sparse: true, index: true },
+  // Optional one-line deck under the title; cards and share previews use it
+  // instead of an auto-generated excerpt when present.
+  subtitle: { type: String, trim: true, maxlength: 200, default: "" },
   titleBackgroundImageUrl: { type: String }, // Optional field for title background image URL from file upload
   content: { type: String, required: [true, "Content is required"] }, // Simple string content
   author: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   tags: [String],
+  // Essay: long-form, polished. Field note: a short observation or lesson.
+  // Purely editorial — doesn't affect visibility, routing, or moderation.
+  postType: { type: String, enum: ["essay", "field-note"], default: "essay" },
   createdAt: { type: Date, default: Date.now },
+  // Set when the author changes what readers see (title, body, tags, cover).
+  // Not a general updatedAt: likes, comments and view counts don't touch it,
+  // so it's safe to use as the sitemap's lastModified.
+  editedAt: { type: Date },
   // "published" with a future publishedAt is how a scheduled post stays
   // hidden until then (see utils/blogVisibility.js) — no separate
   // "scheduled" status needed.
   status: { type: String, enum: ["draft", "published"], default: "published" },
   publishedAt: { type: Date },
+  // When followers and email subscribers were told the post went live. Set
+  // once, by utils/announce.js, so a post is never announced twice.
+  announcedAt: { type: Date, default: null },
   likes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], // Array to store users who liked the post
+  // Applause: each reader can clap up to MAX_CLAPS times. Anyone with claps
+  // is also in `likes` (clapping is liking, more emphatically), and
+  // clapCount is the running total, kept in step with the entries.
+  claps: [{
+    _id: false,
+    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    count: { type: Number, min: 1, max: 50, required: true },
+  }],
+  clapCount: { type: Number, default: 0 },
   shares: { type: Number, default: 0 }, // Counter for shares
   views: { type: Number, default: 0 }, // Counter for reads, bumped on each fetch by id/slug
   comments: [commentSchema] // Array of comment sub-documents

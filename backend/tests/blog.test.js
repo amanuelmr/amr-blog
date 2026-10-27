@@ -1,5 +1,5 @@
 const request = require('supertest');
-const app = require('../index');
+const app = require('./server');
 const { registerVerifyLogin } = require('./helpers');
 
 const createBlog = (agent, overrides = {}) =>
@@ -29,6 +29,95 @@ describe('Blog API', () => {
       const agent = request.agent(app);
       await registerVerifyLogin(agent);
       await agent.post('/api/v1/blogs/create').send({ title: '' }).expect(400);
+    });
+
+    it('defaults postType to essay and accepts field-note explicitly', async () => {
+      const agent = request.agent(app);
+      await registerVerifyLogin(agent);
+      const essay = await createBlog(agent).expect(201);
+      expect(essay.body.blog.postType).toBe('essay');
+
+      const note = await createBlog(agent, { postType: 'field-note' }).expect(201);
+      expect(note.body.blog.postType).toBe('field-note');
+    });
+
+    it('rejects more than 5 tags, as an array or a comma-separated string', async () => {
+      const agent = request.agent(app);
+      await registerVerifyLogin(agent);
+      await createBlog(agent, { tags: 'a,b,c,d,e,f' }).expect(400);
+      await createBlog(agent, { tags: ['a', 'b', 'c', 'd', 'e', 'f'] }).expect(400);
+      await createBlog(agent, { tags: 'a,b,c,d,e' }).expect(201);
+    });
+
+    it('rejects an unrecognized postType', async () => {
+      const agent = request.agent(app);
+      await registerVerifyLogin(agent);
+      await createBlog(agent, { postType: 'tutorial' }).expect(400);
+    });
+  });
+
+  describe('subtitle', () => {
+    it('is stored on create, cleared with an empty string, and searchable', async () => {
+      const agent = request.agent(app);
+      await registerVerifyLogin(agent);
+      const created = await createBlog(agent, { subtitle: '  Why idempotency keys matter  ' }).expect(201);
+      expect(created.body.blog.subtitle).toBe('Why idempotency keys matter');
+
+      const found = await request(app).get('/api/v1/blogs/search?query=idempotency').expect(200);
+      expect(found.body.total).toBe(1);
+
+      const cleared = await agent
+        .put(`/api/v1/blogs/${created.body.blog._id}`)
+        .send({ subtitle: '' })
+        .expect(200);
+      expect(cleared.body.blog.subtitle).toBe('');
+    });
+
+    it('rejects a subtitle over 200 characters', async () => {
+      const agent = request.agent(app);
+      await registerVerifyLogin(agent);
+      await createBlog(agent, { subtitle: 'x'.repeat(201) }).expect(400);
+    });
+  });
+
+  describe('edit', () => {
+    it('changes postType on an existing blog', async () => {
+      const agent = request.agent(app);
+      await registerVerifyLogin(agent);
+      const created = await createBlog(agent).expect(201);
+      const res = await agent
+        .put(`/api/v1/blogs/${created.body.blog._id}`)
+        .send({ postType: 'field-note' })
+        .expect(200);
+      expect(res.body.blog.postType).toBe('field-note');
+    });
+  });
+
+  describe('editedAt', () => {
+    it('is set by a content edit but not by a like or a comment', async () => {
+      const agent = request.agent(app);
+      await registerVerifyLogin(agent);
+      const created = await createBlog(agent).expect(201);
+      const id = created.body.blog._id;
+      expect(created.body.blog.editedAt).toBeUndefined();
+
+      const liked = await agent.post(`/api/v1/blogs/${id}/like`).expect(200);
+      expect(liked.body.editedAt).toBeUndefined();
+      await agent.post(`/api/v1/blogs/${id}/comments`).send({ text: 'Nice' }).expect(201);
+
+      const edited = await agent.put(`/api/v1/blogs/${id}`).send({ title: 'Retitled' }).expect(200);
+      expect(edited.body.blog.editedAt).toBeDefined();
+    });
+
+    it('is not set by a status-only change', async () => {
+      const agent = request.agent(app);
+      await registerVerifyLogin(agent);
+      const created = await createBlog(agent, { status: 'draft' }).expect(201);
+      const res = await agent
+        .put(`/api/v1/blogs/${created.body.blog._id}`)
+        .send({ status: 'published' })
+        .expect(200);
+      expect(res.body.blog.editedAt).toBeUndefined();
     });
   });
 
@@ -65,6 +154,16 @@ describe('Blog API', () => {
 
       const res = await request(app).get(`/api/v1/blogs/${slug}`).expect(200);
       expect(res.body._id).toBe(created.body.blog._id);
+    });
+
+    it('filters the feed to one exact tag, case-insensitively', async () => {
+      const agent = request.agent(app);
+      await registerVerifyLogin(agent);
+      await createBlog(agent, { title: 'Tagged', tags: 'Rust,systems' }).expect(201);
+      await createBlog(agent, { title: 'Near miss', tags: 'rustic' }).expect(201);
+
+      const res = await request(app).get('/api/v1/blogs?tag=rust').expect(200);
+      expect(res.body.blogs.map((b) => b.title)).toEqual(['Tagged']);
     });
 
     it("filters the feed to one author's posts for their profile page", async () => {
@@ -115,6 +214,150 @@ describe('Blog API', () => {
 
       const unliked = await agent.post(`/api/v1/blogs/${id}/like`).expect(200);
       expect(unliked.body.likes.length).toBe(0);
+    });
+  });
+
+  describe('claps', () => {
+    const setup = async () => {
+      const author = request.agent(app);
+      await registerVerifyLogin(author);
+      const { body } = await createBlog(author).expect(201);
+      const reader = request.agent(app);
+      await registerVerifyLogin(reader, { email: 'reader@example.com', name: 'Reader' });
+      return { author, reader, id: body.blog._id };
+    };
+
+    it('adds claps up to 50 per reader, counts as a like, and can be taken back', async () => {
+      const { reader, id } = await setup();
+      expect((await reader.post(`/api/v1/blogs/${id}/clap`).send({ count: 3 }).expect(200)).body).toEqual({ clapCount: 3, mine: 3 });
+      expect((await reader.post(`/api/v1/blogs/${id}/clap`).send({ count: 50 }).expect(200)).body).toEqual({ clapCount: 50, mine: 50 });
+
+      const read = await reader.get(`/api/v1/blogs/${id}`).expect(200);
+      expect(read.body.myClaps).toBe(50);
+      expect(read.body.likes).toHaveLength(1);
+
+      expect((await reader.delete(`/api/v1/blogs/${id}/clap`).expect(200)).body).toEqual({ clapCount: 0, mine: 0 });
+      expect((await reader.get(`/api/v1/blogs/${id}`)).body.likes).toHaveLength(0);
+    });
+
+    it("rejects a bad count, an author's own post, and anonymous claps", async () => {
+      const { author, reader, id } = await setup();
+      await reader.post(`/api/v1/blogs/${id}/clap`).send({ count: 0 }).expect(400);
+      await reader.post(`/api/v1/blogs/${id}/clap`).send({ count: 51 }).expect(400);
+      await author.post(`/api/v1/blogs/${id}/clap`).send({ count: 1 }).expect(400);
+      await request(app).post(`/api/v1/blogs/${id}/clap`).send({ count: 1 }).expect(401);
+    });
+
+    it('keeps the legacy like toggle in step with claps', async () => {
+      const { reader, id } = await setup();
+      await reader.post(`/api/v1/blogs/${id}/clap`).send({ count: 7 }).expect(200);
+      const unliked = await reader.post(`/api/v1/blogs/${id}/like`).expect(200);
+      expect(unliked.body.clapCount).toBe(0);
+      const liked = await reader.post(`/api/v1/blogs/${id}/like`).expect(200);
+      expect(liked.body.clapCount).toBe(1);
+    });
+
+    it('backfills one clap per existing like', async () => {
+      const Blog = require('../models/Blog');
+      const backfillClaps = require('../utils/backfillClaps');
+      const { reader, id } = await setup();
+      const readerId = (await reader.post(`/api/v1/blogs/${id}/like`)).body.likes[0];
+      await Blog.updateOne({ _id: id }, { $set: { claps: [], clapCount: 0 } });
+
+      await backfillClaps();
+      const blog = await Blog.findById(id);
+      expect(blog.clapCount).toBe(1);
+      expect(blog.claps[0].user.toString()).toBe(readerId);
+    });
+  });
+
+  describe('recommend', () => {
+    it("suggests unread posts on the topics a reader has read, excluding their own", async () => {
+      const author = request.agent(app);
+      await registerVerifyLogin(author);
+      const read = await createBlog(author, { title: 'Read one', tags: 'go' }).expect(201);
+      await createBlog(author, { title: 'Same topic', tags: 'go' }).expect(201);
+      await createBlog(author, { title: 'Other topic', tags: 'css' }).expect(201);
+
+      const reader = request.agent(app);
+      await registerVerifyLogin(reader, { email: 'reader@example.com', name: 'Reader' });
+      await createBlog(reader, { title: 'Reader wrote this', tags: 'go' }).expect(201);
+      await reader.get(`/api/v1/blogs/${read.body.blog._id}`).expect(200);
+
+      const res = await reader.get('/api/v1/blogs/recommend').expect(200);
+      expect(res.body.total).toBe(1);
+      expect(res.body.blogs.map((b) => b.title)).toEqual(['Same topic']);
+    });
+
+    it('requires auth', async () => {
+      await request(app).get('/api/v1/blogs/recommend').expect(401);
+    });
+  });
+
+  describe('following', () => {
+    it('follows a writer and a topic, and the Following feed shows both', async () => {
+      const writer = request.agent(app);
+      await registerVerifyLogin(writer, { email: 'writer@example.com', name: 'Writer' });
+      await createBlog(writer, { title: 'From the writer', tags: 'css' }).expect(201);
+
+      const other = request.agent(app);
+      await registerVerifyLogin(other, { email: 'other@example.com', name: 'Other' });
+      await createBlog(other, { title: 'On a followed topic', tags: 'Go' }).expect(201);
+      await createBlog(other, { title: 'Unrelated', tags: 'rust' }).expect(201);
+
+      const reader = request.agent(app);
+      await registerVerifyLogin(reader, { email: 'reader@example.com', name: 'Reader' });
+      const empty = await reader.get('/api/v1/blogs/following').expect(200);
+      expect(empty.body.total).toBe(0);
+
+      const feed = await request(app).get('/api/v1/blogs').expect(200);
+      const writerUserId = feed.body.blogs.find((b) => b.title === 'From the writer').author._id;
+
+      const followed = await reader.post(`/api/v1/auth/users/${writerUserId}/follow`).expect(200);
+      expect(followed.body).toEqual({ following: true, followers: 1 });
+      const topic = await reader.post('/api/v1/blogs/topics/go/follow').expect(200);
+      expect(topic.body.following).toBe(true);
+
+      const mine = await reader.get('/api/v1/auth/me/follows').expect(200);
+      expect(mine.body.topics).toEqual(['go']);
+
+      const following = await reader.get('/api/v1/blogs/following').expect(200);
+      expect(following.body.blogs.map((b) => b.title).sort()).toEqual(['From the writer', 'On a followed topic']);
+
+      const profile = await reader.get(`/api/v1/auth/users/${writerUserId}`).expect(200);
+      expect(profile.body.followers).toBe(1);
+      expect(profile.body.isFollowing).toBe(true);
+
+      const unfollowed = await reader.post(`/api/v1/auth/users/${writerUserId}/follow`).expect(200);
+      expect(unfollowed.body).toEqual({ following: false, followers: 0 });
+    });
+
+    it("can't follow yourself, and requires auth", async () => {
+      const agent = request.agent(app);
+      await registerVerifyLogin(agent);
+      const { body } = await createBlog(agent).expect(201);
+      await agent.post(`/api/v1/auth/users/${body.blog.author}/follow`).expect(400);
+      await request(app).post(`/api/v1/auth/users/${body.blog.author}/follow`).expect(401);
+      await request(app).get('/api/v1/blogs/following').expect(401);
+    });
+  });
+
+  describe('share', () => {
+    it('counts shares of a live post without requiring auth', async () => {
+      const agent = request.agent(app);
+      await registerVerifyLogin(agent);
+      const { body } = await createBlog(agent).expect(201);
+      const id = body.blog._id;
+
+      expect((await request(app).post(`/api/v1/blogs/${id}/share`).expect(200)).body.shares).toBe(1);
+      expect((await request(app).post(`/api/v1/blogs/${id}/share`).expect(200)).body.shares).toBe(2);
+    });
+
+    it("404s for a draft, so a private post can't be probed", async () => {
+      const agent = request.agent(app);
+      await registerVerifyLogin(agent);
+      const { body } = await createBlog(agent, { status: 'draft' }).expect(201);
+      await request(app).post(`/api/v1/blogs/${body.blog._id}/share`).expect(404);
     });
   });
 
@@ -207,6 +450,28 @@ describe('Blog API', () => {
       const created = await createBlog(agent).expect(201);
       const id = created.body.blog._id;
       await agent.post(`/api/v1/blogs/${id}/comments`).send({ text: '   ' }).expect(400);
+    });
+
+    it("lets a post's author delete anyone's comment, but not edit it", async () => {
+      const author = request.agent(app);
+      await registerVerifyLogin(author);
+      const { body } = await createBlog(author).expect(201);
+      const id = body.blog._id;
+
+      const reader = request.agent(app);
+      await registerVerifyLogin(reader, { email: 'reader@example.com', name: 'Reader' });
+      const posted = await reader.post(`/api/v1/blogs/${id}/comments`).send({ text: 'Spam' }).expect(201);
+      const commentId = posted.body.comment._id;
+
+      const bystander = request.agent(app);
+      await registerVerifyLogin(bystander, { email: 'bystander@example.com', name: 'Bystander' });
+      await bystander.delete(`/api/v1/blogs/${id}/comments/${commentId}`).expect(401);
+
+      await author.put(`/api/v1/blogs/${id}/comments/${commentId}`).send({ text: 'Edited' }).expect(401);
+      await author.delete(`/api/v1/blogs/${id}/comments/${commentId}`).expect(200);
+
+      const list = await request(app).get(`/api/v1/blogs/${id}/comments`).expect(200);
+      expect(list.body.total).toBe(0);
     });
 
     describe('threaded replies', () => {
@@ -344,6 +609,100 @@ describe('Blog API', () => {
 
       await other.post(`/api/v1/blogs/${id}/like`).expect(404);
       await other.post(`/api/v1/blogs/${id}/comments`).send({ text: 'hi' }).expect(404);
+    });
+  });
+
+  describe('popular & topics', () => {
+    it('orders by views with sort=popular and counts topics across live posts', async () => {
+      const agent = request.agent(app);
+      await registerVerifyLogin(agent);
+      const quiet = await createBlog(agent, { title: 'Quiet', tags: 'go,css' }).expect(201);
+      const busy = await createBlog(agent, { title: 'Busy', tags: 'go' }).expect(201);
+      await createBlog(agent, { title: 'Hidden', tags: 'secret', status: 'draft' }).expect(201);
+      await request.agent(app).get(`/api/v1/blogs/${busy.body.blog._id}`).expect(200);
+      await request.agent(app).get(`/api/v1/blogs/${busy.body.blog._id}`).expect(200);
+      await request.agent(app).get(`/api/v1/blogs/${quiet.body.blog._id}`).expect(200);
+
+      const popular = await request(app).get('/api/v1/blogs?sort=popular').expect(200);
+      expect(popular.body.blogs.map((b) => b.title)).toEqual(['Busy', 'Quiet']);
+
+      const topics = await request(app).get('/api/v1/blogs/topics').expect(200);
+      expect(topics.body.topics).toEqual([
+        { tag: 'go', count: 2 },
+        { tag: 'css', count: 1 },
+      ]);
+    });
+  });
+
+  describe('view counting', () => {
+    const viewsOf = async (id) => (await request(app).get(`/api/v1/blogs/${id}?view=false`)).body.views;
+
+    it("doesn't count the author's own visits", async () => {
+      const author = request.agent(app);
+      await registerVerifyLogin(author);
+      const { body } = await createBlog(author).expect(201);
+      await author.get(`/api/v1/blogs/${body.blog._id}`).expect(200);
+      await author.get(`/api/v1/blogs/${body.blog._id}`).expect(200);
+      expect(await viewsOf(body.blog._id)).toBe(0);
+    });
+
+    it('counts a signed-in reader once, however often they come back', async () => {
+      const author = request.agent(app);
+      await registerVerifyLogin(author);
+      const { body } = await createBlog(author).expect(201);
+
+      const reader = request.agent(app);
+      await registerVerifyLogin(reader, { email: 'reader@example.com', name: 'Reader' });
+      await reader.get(`/api/v1/blogs/${body.blog._id}`).expect(200);
+      await reader.get(`/api/v1/blogs/${body.blog._id}`).expect(200);
+      expect(await viewsOf(body.blog._id)).toBe(1);
+    });
+
+    it('counts an anonymous browser once (cookie), but separate browsers separately', async () => {
+      const author = request.agent(app);
+      await registerVerifyLogin(author);
+      const { body } = await createBlog(author).expect(201);
+      const id = body.blog._id;
+
+      const browser = request.agent(app);
+      const first = await browser.get(`/api/v1/blogs/${id}`).expect(200);
+      expect(first.body.views).toBe(1);
+      const again = await browser.get(`/api/v1/blogs/${id}`).expect(200);
+      expect(again.body.views).toBe(1);
+
+      await request.agent(app).get(`/api/v1/blogs/${id}`).expect(200);
+      expect(await viewsOf(id)).toBe(2);
+    });
+  });
+
+  describe('publish-date ordering', () => {
+    it('orders the public feed by publish date, not creation date', async () => {
+      const agent = request.agent(app);
+      await registerVerifyLogin(agent);
+      // Created first, published now.
+      await createBlog(agent, { title: 'Written last week, live today' }).expect(201);
+      // Created second, but backdated: it went live yesterday.
+      const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      await createBlog(agent, { title: 'Live since yesterday', publishedAt: yesterday }).expect(201);
+
+      const feed = await request(app).get('/api/v1/blogs').expect(200);
+      expect(feed.body.blogs.map((b) => b.title)).toEqual([
+        'Written last week, live today',
+        'Live since yesterday',
+      ]);
+    });
+
+    it('backfills a missing publishedAt on live legacy posts from createdAt', async () => {
+      const Blog = require('../models/Blog');
+      const backfillPublishedAt = require('../utils/backfillPublishedAt');
+      const createdAt = new Date('2024-03-01T10:00:00Z');
+      const legacy = await Blog.create({ title: 'Legacy', content: 'Old', status: 'published', createdAt });
+      const draft = await Blog.create({ title: 'Draft', content: 'Wip', status: 'draft' });
+
+      await backfillPublishedAt();
+
+      expect((await Blog.findById(legacy._id)).publishedAt.toISOString()).toBe(createdAt.toISOString());
+      expect((await Blog.findById(draft._id)).publishedAt).toBeUndefined();
     });
   });
 

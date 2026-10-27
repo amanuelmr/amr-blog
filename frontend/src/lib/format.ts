@@ -3,6 +3,11 @@ export function blogHref(blog: { _id: string; slug?: string }): string {
   return `/blog/${blog.slug || blog._id}`;
 }
 
+/** The reader-facing label for a post's type — undefined/legacy posts read as an essay. */
+export function postTypeLabel(postType?: "essay" | "field-note"): string {
+  return postType === "field-note" ? "Field note" : "Essay";
+}
+
 export type PublishState = "draft" | "scheduled" | "live";
 
 // A "published" post with a future publishedAt is scheduled, not live yet —
@@ -11,6 +16,14 @@ export function publishState(blog: { status: string; publishedAt?: string | null
   if (blog.status !== "published") return "draft";
   if (blog.publishedAt && new Date(blog.publishedAt) > new Date()) return "scheduled";
   return "live";
+}
+
+/**
+ * The date a reader should see on a post: when it went live. Legacy posts
+ * without a publishedAt fall back to when they were written.
+ */
+export function publishedDate(blog: { publishedAt?: string | null; createdAt: string }): string {
+  return blog.publishedAt || blog.createdAt;
 }
 
 export function formatDate(iso?: string): string {
@@ -85,6 +98,11 @@ export function initials(name?: string): string {
     .slice(0, 2)
     .map((w) => w[0]?.toUpperCase() ?? "")
     .join("");
+}
+
+/** A post's one-line summary for cards and previews: its subtitle, else an excerpt. */
+export function summary(blog: { subtitle?: string; content: string }, max = 160): string {
+  return blog.subtitle?.trim() || excerpt(blog.content, max);
 }
 
 /** Deterministic plain-text excerpt from (possibly HTML) content. */

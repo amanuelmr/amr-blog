@@ -1,46 +1,40 @@
 import type { Metadata } from "next";
-import localFont from "next/font/local";
-import { Fraunces, Literata } from "next/font/google";
+import { Inter, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
+import { FollowsProvider } from "@/context/FollowsContext";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 
-// UI chrome: labels, metadata, buttons. Kept as Geist — it is quiet, which is
-// what chrome should be.
-const geistSans = localFont({
-  src: "./fonts/GeistVF.woff",
-  variable: "--font-geist-sans",
-  weight: "100 900",
-});
-const geistMono = localFont({
-  src: "./fonts/GeistMonoVF.woff",
-  variable: "--font-geist-mono",
-  weight: "100 900",
+// Body copy, navigation, buttons, long-form reading — everything that is
+// meant to be read quickly and quietly.
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-sans",
+  display: "swap",
 });
 
-// Display: Fraunces carries the masthead and headlines. Its optical-size axis
-// keeps large titles tight and small ones readable, which is what gives the
-// page a voice instead of the system serif it used to fall back to.
-const fraunces = Fraunces({
+// The technical voice: the masthead, headlines, article numbers, dates,
+// categories and other metadata. One mono face carries both the display type
+// and the code blocks, instead of splitting display/body/code across three
+// unrelated families.
+const plexMono = IBM_Plex_Mono({
   subsets: ["latin"],
-  variable: "--font-display",
+  variable: "--font-mono",
   display: "swap",
-  axes: ["SOFT", "WONK", "opsz"],
+  weight: ["400", "500", "600", "700"],
 });
 
-// Reading: Literata was designed for long-form screen reading — sturdier and
-// lower-contrast than the display face, so headings and body never look like
-// the same font at two sizes.
-const literata = Literata({
-  subsets: ["latin"],
-  variable: "--font-reading",
-  display: "swap",
-  style: ["normal", "italic"],
-});
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/$/, "");
 
 export const metadata: Metadata = {
-  title: "AMR Blog — writing on building software",
+  // Resolves relative canonical/Open Graph URLs set by individual pages.
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: "AMR Blog — writing on building software",
+    template: "%s — AMR Blog",
+  },
+  openGraph: { siteName: "AMR Blog", type: "website" },
   description:
     "Articles on backend, systems, and the craft of building software. Read, discuss, and publish.",
   alternates: {
@@ -59,16 +53,16 @@ export default function RootLayout({
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} ${literata.variable} font-sans antialiased`}
-      >
+      <body className={`${inter.variable} ${plexMono.variable} font-sans antialiased`}>
         <AuthProvider>
+          <FollowsProvider>
           <a href="#main" className="skip-link">Skip to content</a>
           <div className="flex min-h-screen flex-col">
             <Header />
             <main id="main" className="flex-1">{children}</main>
             <Footer />
           </div>
+          </FollowsProvider>
         </AuthProvider>
       </body>
     </html>

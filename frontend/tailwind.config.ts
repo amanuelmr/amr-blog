@@ -1,6 +1,7 @@
 import type { Config } from "tailwindcss";
 
-const READING_STACK = 'var(--font-reading), "Iowan Old Style", Charter, Georgia, ui-serif, serif';
+const SANS_STACK = "var(--font-sans), ui-sans-serif, system-ui, sans-serif";
+const MONO_STACK = "var(--font-mono), ui-monospace, monospace";
 
 const config: Config = {
   darkMode: "class",
@@ -27,12 +28,11 @@ const config: Config = {
         "accent-soft": "rgb(var(--accent-soft) / <alpha-value>)",
       },
       fontFamily: {
-        sans: ["var(--font-geist-sans)", "ui-sans-serif", "system-ui", "sans-serif"],
-        mono: ["var(--font-geist-mono)", "ui-monospace", "monospace"],
-        // The masthead and headlines.
-        display: ["var(--font-display)", "Iowan Old Style", "Charter", "Georgia", "ui-serif", "serif"],
-        // Long-form reading.
-        serif: [READING_STACK],
+        sans: ["var(--font-sans)", "ui-sans-serif", "system-ui", "sans-serif"],
+        mono: ["var(--font-mono)", "ui-monospace", "monospace"],
+        // The masthead, headlines and article numbers share the mono voice
+        // with metadata and code — one technical face, not three.
+        display: ["var(--font-mono)", "ui-monospace", "monospace"],
       },
       fontSize: {
         // Editorial scale: metadata and labels are deliberately small and
@@ -61,23 +61,25 @@ const config: Config = {
       typography: {
         DEFAULT: {
           css: {
-            fontFamily: READING_STACK,
+            fontFamily: SANS_STACK,
             "--tw-prose-body": "rgb(var(--fg))",
             "--tw-prose-headings": "rgb(var(--fg))",
             "--tw-prose-links": "rgb(var(--accent))",
             "--tw-prose-quotes": "rgb(var(--fg))",
             "--tw-prose-quote-borders": "rgb(var(--accent))",
             "--tw-prose-captions": "rgb(var(--muted))",
-            h2: { fontFamily: "var(--font-display), ui-serif, serif", letterSpacing: "-0.015em" },
-            h3: { fontFamily: "var(--font-display), ui-serif, serif", letterSpacing: "-0.01em" },
+            // Section headings within an article are body-voice, not
+            // display-voice — only the article title itself is set in mono.
+            h2: { fontFamily: SANS_STACK, letterSpacing: "-0.01em" },
+            h3: { fontFamily: SANS_STACK, letterSpacing: "-0.005em" },
             code: {
-              fontFamily: "var(--font-geist-mono), ui-monospace, monospace",
+              fontFamily: MONO_STACK,
               fontWeight: "500",
             },
             "code::before": { content: '""' },
             "code::after": { content: '""' },
             pre: {
-              fontFamily: "var(--font-geist-mono), ui-monospace, monospace",
+              fontFamily: MONO_STACK,
             },
             blockquote: {
               fontStyle: "normal",

@@ -58,6 +58,8 @@ const ensureDb = async (req, res, next) => {
 // Routes
 app.use('/api/v1/auth', ensureDb, require('./routes/authRoutes'));
 app.use('/api/v1/blogs', ensureDb, require('./routes/blogRoutes'));
+app.use('/api/v1/notifications', ensureDb, require('./routes/notificationRoutes'));
+app.use('/api/v1/lists', ensureDb, require('./routes/listRoutes'));
 
 // Test Route
 app.get('/test', (req, res) => {

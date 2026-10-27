@@ -21,8 +21,11 @@ const connectDB = async () => {
       serverSelectionTimeoutMS: 8000, // fail fast on cold start instead of hanging
       maxPoolSize: 5, // keep the connection pool small on serverless
     })
-    .then((m) => {
+    .then(async (m) => {
       console.log("MongoDB connected");
+      // Required lazily: models register on the shared mongoose instance.
+      await require("../utils/backfillPublishedAt")();
+      await require("../utils/backfillClaps")();
       return m.connection;
     })
     .catch((err) => {

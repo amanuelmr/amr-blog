@@ -3,13 +3,14 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
-import { Blog, BlogStatus } from "@/lib/types";
+import { Blog, BlogStatus, PostType } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
 import { FormAlert } from "@/components/AuthCard";
 import { RichTextEditor } from "@/components/editor/RichTextEditor";
 import { CoverImageInput } from "@/components/editor/CoverImageInput";
 import { TagInput } from "@/components/ui/TagInput";
-import { stripHtml, contentToHtml, blogHref, publishState } from "@/lib/format";
+import { stripHtml, contentToHtml, blogHref, publishState, relativeTime } from "@/lib/format";
+import { useLocalDraft } from "@/components/editor/useLocalDraft";
 import { uploadToCloudinary } from "@/lib/uploadToCloudinary";
 
 type Action = "draft" | "publish" | "schedule";
@@ -24,14 +25,38 @@ function toDateTimeLocal(iso: string): string {
 export function BlogForm({ mode, blog }: { mode: "create" | "edit"; blog?: Blog }) {
   const router = useRouter();
   const [title, setTitle] = useState(blog?.title ?? "");
+  const [subtitle, setSubtitle] = useState(blog?.subtitle ?? "");
   // Editor works in HTML; legacy plain-text posts are normalized on load.
   const [content, setContent] = useState(blog ? contentToHtml(blog.content) : "");
   const [tags, setTags] = useState<string[]>(blog?.tags ?? []);
+  const [postType, setPostType] = useState<PostType>(blog?.postType ?? "essay");
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(blog?.titleBackgroundImageUrl ?? null);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const titleRef = useRef<HTMLTextAreaElement>(null);
+  // Bumped to remount the editor when recovered content replaces its value
+  // (the editor only reads `value` on mount).
+  const [editorKey, setEditorKey] = useState(0);
+
+  const [initialFields] = useState(() => ({
+    title: blog?.title ?? "",
+    subtitle: blog?.subtitle ?? "",
+    content: blog ? contentToHtml(blog.content) : "",
+    tags: blog?.tags ?? [],
+  }));
+  const localDraft = useLocalDraft(blog?._id, initialFields, { title, subtitle, content, tags });
+  const { recovered } = localDraft;
+
+  function restoreLocalDraft() {
+    if (!recovered) return;
+    setTitle(recovered.title);
+    setSubtitle(recovered.subtitle);
+    setContent(recovered.content);
+    setTags(recovered.tags);
+    setEditorKey((k) => k + 1);
+    localDraft.dismissRecovered();
+  }
 
   const wasAlreadyLive = !!blog && publishState(blog) === "live";
   const [action, setAction] = useState<Action>(() => {
@@ -102,13 +127,16 @@ export function BlogForm({ mode, blog }: { mode: "create" | "edit"; blog?: Blog 
           method: mode === "create" ? "POST" : "PUT",
           body: {
             title: title.trim(),
+            subtitle: subtitle.trim(),
             content,
             tags,
+            postType,
             titleBackgroundImageUrl: coverUrl,
             ...statusPayload(),
           },
         }
       );
+      localDraft.clear();
       router.push(res.blog.status === "draft" ? "/write/mine" : blogHref(res.blog));
       router.refresh();
     } catch (err) {
@@ -133,6 +161,15 @@ export function BlogForm({ mode, blog }: { mode: "create" | "edit"; blog?: Blog 
             ← Back
           </button>
           <div className="flex items-center gap-2">
+            <select
+              value={postType}
+              onChange={(e) => setPostType(e.target.value as PostType)}
+              aria-label="Post type"
+              className="rounded-lg border border-border bg-card px-2.5 py-1.5 text-sm text-fg focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
+            >
+              <option value="essay">Essay</option>
+              <option value="field-note">Field note</option>
+            </select>
             <select
               value={action}
               onChange={(e) => setAction(e.target.value as Action)}
@@ -166,6 +203,20 @@ export function BlogForm({ mode, blog }: { mode: "create" | "edit"; blog?: Blog 
           </div>
         )}
 
+        {recovered && (
+          <div className="mb-6 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-sm text-amber-700 dark:text-amber-400">
+            <span className="flex-1">
+              You have unsaved changes from {relativeTime(new Date(recovered.savedAt).toISOString())}.
+            </span>
+            <button type="button" onClick={restoreLocalDraft} className="font-medium underline underline-offset-2">
+              Restore
+            </button>
+            <button type="button" onClick={localDraft.discard} className="text-muted hover:text-fg">
+              Discard
+            </button>
+          </div>
+        )}
+
         <CoverImageInput preview={preview} onSelect={selectCover} onRemove={removeCover} />
 
         <textarea
@@ -176,10 +227,19 @@ export function BlogForm({ mode, blog }: { mode: "create" | "edit"; blog?: Blog 
           maxLength={300}
           aria-label="Title"
           placeholder="Title"
-          className="mb-4 w-full resize-none overflow-hidden border-0 bg-transparent p-0 font-serif text-4xl font-bold leading-tight tracking-tight text-fg placeholder:text-muted/40 focus:outline-none focus:ring-0 sm:text-5xl"
+          className="mb-2 w-full resize-none overflow-hidden border-0 bg-transparent p-0 font-display text-4xl font-bold leading-tight tracking-tight text-fg placeholder:text-muted/40 focus:outline-none focus:ring-0 sm:text-5xl"
         />
 
-        <RichTextEditor value={content} onChange={setContent} />
+        <input
+          value={subtitle}
+          onChange={(e) => setSubtitle(e.target.value)}
+          maxLength={200}
+          aria-label="Subtitle"
+          placeholder="Add a subtitle (optional)"
+          className="mb-6 w-full border-0 bg-transparent p-0 text-xl leading-snug text-muted placeholder:text-muted/40 focus:outline-none focus:ring-0"
+        />
+
+        <RichTextEditor key={editorKey} value={content} onChange={setContent} />
 
         <div className="mt-12 border-t border-border pt-6">
           <p className="mb-3 text-xs font-medium uppercase tracking-wider text-muted">Tags</p>

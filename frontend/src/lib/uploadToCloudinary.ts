@@ -13,7 +13,7 @@ interface UploadSignature {
 // limit). Returns the hosted secure URL.
 export async function uploadToCloudinary(
   file: File,
-  type: "cover" | "content" = "cover"
+  type: "cover" | "content" | "avatar" = "cover"
 ): Promise<string> {
   const sig = await api<UploadSignature>(`/blogs/upload-signature?type=${type}`);
 

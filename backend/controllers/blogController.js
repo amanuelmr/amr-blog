@@ -1,12 +1,17 @@
 const mongoose = require("mongoose");
 const Blog = require("../models/Blog");
+const Notification = require("../models/Notification");
+const Highlight = require("../models/Highlight");
 const User = require("../models/User");
 const escapeRegex = require("../utils/escapeRegex");
+const notify = require("../utils/notify");
+const { announceDuePosts, announceDuePostsThrottled } = require("../utils/announce");
 const getPagination = require("../utils/pagination");
 const sanitizeContent = require("../utils/sanitizeContent");
 const { makeSlug } = require("../utils/slugify");
 const { cloudinary } = require("../config/cloudinary");
-const { publicFilter, isPublished, isVisibleTo } = require("../utils/blogVisibility");
+const { PUBLIC_USER_FIELDS } = require("../utils/publicUser");
+const { publicFilter, isPublished, isOwner, isVisibleTo, PUBLIC_SORT } = require("../utils/blogVisibility");
 
 // Create a blog
 exports.createBlog = async (req, res) => {
@@ -39,6 +44,7 @@ exports.createBlog = async (req, res) => {
 
     const blog = new Blog({
       title,
+      subtitle: req.body.subtitle || "",
       // Cover is uploaded directly to Cloudinary by the client; we store the URL.
       titleBackgroundImageUrl: req.body.titleBackgroundImageUrl || null,
       content: sanitizeContent(content), // rich HTML — sanitized before persisting
@@ -46,12 +52,16 @@ exports.createBlog = async (req, res) => {
       author: req.user.id,
       status,
       publishedAt,
+      postType: req.body.postType === "field-note" ? "field-note" : "essay",
     });
 
     // Stable, unique, human-readable URL slug derived from the title.
     blog.slug = makeSlug(title, blog._id);
 
     await blog.save();
+    // Publishing now tells followers and subscribers straight away; a
+    // scheduled post is announced once its time comes (see getAllBlogs).
+    await announceDuePosts();
     
     res.status(201).json({
       success: true,
@@ -81,18 +91,25 @@ exports.createBlog = async (req, res) => {
 
 // Get all blogs (paginated). Drafts and not-yet-due scheduled posts are
 // excluded — this is the public feed. An optional ?author=<userId> narrows
-// it to one author's posts, for their public profile page.
+// it to one author's posts, for their public profile page, and ?tag=<tag>
+// to one topic (whole-tag, case-insensitive), for topic pages.
+// ?sort=popular orders by views instead of recency.
 exports.getAllBlogs = async (req, res) => {
   try {
+    await announceDuePostsThrottled();
     const { page, limit, skip } = getPagination(req.query);
     const filter = { ...publicFilter() };
     if (req.query.author && mongoose.isValidObjectId(req.query.author)) {
       filter.author = req.query.author;
     }
+    if (typeof req.query.tag === "string" && req.query.tag.trim()) {
+      filter.tags = { $regex: `^${escapeRegex(req.query.tag.trim())}$`, $options: "i" };
+    }
+    const sort = req.query.sort === "popular" ? { views: -1, ...PUBLIC_SORT } : PUBLIC_SORT;
     const [blogs, total] = await Promise.all([
       Blog.find(filter)
-        .populate("author", "name")
-        .sort({ createdAt: -1 })
+        .populate("author", PUBLIC_USER_FIELDS)
+        .sort(sort)
         .skip(skip)
         .limit(limit),
       Blog.countDocuments(filter),
@@ -111,6 +128,29 @@ exports.getAllBlogs = async (req, res) => {
   }
 };
 
+// The most-used tags across every live post, with how many posts carry
+// each — most-used first, ties alphabetical.
+exports.getTopics = async (req, res) => {
+  try {
+    const limit = Math.min(Math.max(Number(req.query.limit) || 10, 1), 50);
+    const topics = await Blog.aggregate([
+      { $match: publicFilter() },
+      { $unwind: "$tags" },
+      { $group: { _id: "$tags", count: { $sum: 1 } } },
+      { $sort: { count: -1, _id: 1 } },
+      { $limit: limit },
+      { $project: { _id: 0, tag: "$_id", count: 1 } },
+    ]);
+    res.json({ topics });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send("Server error");
+  }
+};
+
+// How long an anonymous browser's view of a post counts as the same view.
+const VIEW_WINDOW_MS = 12 * 60 * 60 * 1000;
+
 // Get a blog by slug (preferred) or by Mongo id (backward compatible). A
 // draft, or a scheduled post whose publish date hasn't arrived, 404s for
 // anyone but its author — attach optionalAuth so req.user is available
@@ -118,9 +158,9 @@ exports.getAllBlogs = async (req, res) => {
 exports.getBlogById = async (req, res) => {
   try {
     const { id } = req.params;
-    let blog = await Blog.findOne({ slug: id }).populate("author", "name");
+    let blog = await Blog.findOne({ slug: id }).populate("author", PUBLIC_USER_FIELDS);
     if (!blog && mongoose.isValidObjectId(id)) {
-      blog = await Blog.findOne({ _id: id }).populate("author", "name");
+      blog = await Blog.findOne({ _id: id }).populate("author", PUBLIC_USER_FIELDS);
     }
 
     if (!blog || !isVisibleTo(blog, req.user)) {
@@ -134,34 +174,44 @@ exports.getBlogById = async (req, res) => {
       await blog.save();
     }
 
-    // Count a real read: publicly live (a draft/scheduled preview is only
-    // reachable by its author anyway) and not explicitly opted out — the
-    // edit page passes ?view=false since loading a draft isn't a read.
-    // $inc stays atomic under concurrent requests; re-checking the public
-    // condition in the query guards against the post's status changing
-    // between the fetch above and this update.
-    if (req.query.view !== "false" && isPublished(blog)) {
-      await Blog.updateOne({ _id: blog._id, ...publicFilter() }, { $inc: { views: 1 } });
-      blog.views += 1;
-    }
-
     // `bookmarked` reflects the requester's own saved posts (bookmarks live
     // on User, not Blog, so it can't be derived from the blog doc alone).
-    let bookmarked = false;
-    if (req.user) {
-      const user = await User.findById(req.user.id);
-      if (user) {
-        bookmarked = user.bookmarkedBlogs.some((b) => b.toString() === blog._id.toString());
-        const alreadyRead = user.readBlogs.some((b) => b.toString() === blog._id.toString());
-        if (!alreadyRead) {
-          user.readBlogs.push(blog._id);
-          await user.save();
-        }
+    const user = req.user ? await User.findById(req.user.id) : null;
+    const bookmarked = !!user && user.bookmarkedBlogs.some((b) => b.toString() === blog._id.toString());
+    const alreadyRead = !!user && user.readBlogs.some((b) => b.toString() === blog._id.toString());
+
+    // Count a view once per reader: a signed-in reader the first time they
+    // open the post, an anonymous one once per browser per VIEW_WINDOW_MS
+    // (tracked with a cookie). The author's own visits never count, nor does
+    // a load that opts out (?view=false — the edit page) or a draft/scheduled
+    // preview. $inc stays atomic under concurrent requests; re-checking the
+    // public condition in the query guards against the post's status
+    // changing between the fetch above and this update.
+    const seenCookie = `seen_${blog._id}`;
+    const repeat = user ? alreadyRead : Boolean(req.cookies?.[seenCookie]);
+    if (req.query.view !== "false" && isPublished(blog) && !isOwner(blog, req.user) && !repeat) {
+      await Blog.updateOne({ _id: blog._id, ...publicFilter() }, { $inc: { views: 1 } });
+      blog.views += 1;
+      if (!user) {
+        res.cookie(seenCookie, "1", {
+          httpOnly: true,
+          maxAge: VIEW_WINDOW_MS,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+        });
       }
+    }
+
+    if (user && !alreadyRead) {
+      user.readBlogs.push(blog._id);
+      await user.save();
     }
 
     const payload = blog.toObject();
     payload.bookmarked = bookmarked;
+    payload.myClaps = req.user
+      ? blog.claps.find((c) => c.user.toString() === req.user.id.toString())?.count ?? 0
+      : 0;
     res.json(payload);
   } catch (err) {
     console.error(err.message);
@@ -188,11 +238,15 @@ exports.editBlog = async (req, res) => {
     
     // Update fields if provided
     if (title) blog.title = title;
+    if (req.body.subtitle !== undefined) blog.subtitle = req.body.subtitle; // "" clears it
     if (content) blog.content = sanitizeContent(content);
     if (tags) {
       blog.tags = Array.isArray(tags) ? tags : tags.split(',').map(tag => tag.trim());
     }
-    
+    if (req.body.postType !== undefined) {
+      blog.postType = req.body.postType === "field-note" ? "field-note" : "essay";
+    }
+
     // Cover URL: update when provided (a string sets it, null/"" clears it).
     if (req.body.titleBackgroundImageUrl !== undefined) {
       blog.titleBackgroundImageUrl = req.body.titleBackgroundImageUrl || null;
@@ -215,12 +269,17 @@ exports.editBlog = async (req, res) => {
       blog.publishedAt = req.body.publishedAt; // reschedule without changing status
     }
 
+    if (["title", "subtitle", "content", "tags", "titleBackgroundImageUrl"].some((f) => blog.isModified(f))) {
+      blog.editedAt = new Date();
+    }
+
     // Keep the slug stable across edits (link permanence); backfill if missing.
     if (!blog.slug) {
       blog.slug = makeSlug(blog.title, blog._id);
     }
 
     await blog.save();
+    await announceDuePosts(); // a draft just published, or a reschedule to now
 
     return res.status(200).json({ 
       success: true,
@@ -248,6 +307,8 @@ exports.deleteBlog = async (req, res) => {
         return res.status(401).json({ msg: "User not authorized to delete this blog" });
       }
       await blog.deleteOne();
+      await Notification.deleteMany({ blog: blog._id });
+      await Highlight.deleteMany({ blog: blog._id });
   
       return res.status(200).json({ msg: "Blog deleted successfully" });
     } catch (error) {
@@ -274,15 +335,16 @@ exports.searchBlogs = async (req, res) => {
     // (prevents regex injection / ReDoS).
     const safeQuery = escapeRegex(query.trim());
     // $and, not a spread: publicFilter() already has its own top-level $or.
-    // Tags match whole-string (anchored) rather than as a substring: the tag
-    // chips on an article link here, and a chip must return the posts carrying
-    // that exact tag — not every post that happens to mention the word.
+    // Tags match whole-string (anchored) rather than as a substring: searching
+    // a tag's name should return the posts carrying that exact tag — not
+    // every post whose tags merely contain the word.
     const filter = {
       $and: [
         publicFilter(),
         {
           $or: [
             { title: { $regex: safeQuery, $options: "i" } },
+            { subtitle: { $regex: safeQuery, $options: "i" } },
             { content: { $regex: safeQuery, $options: "i" } },
             { tags: { $regex: `^${safeQuery}$`, $options: "i" } },
           ],
@@ -293,8 +355,8 @@ exports.searchBlogs = async (req, res) => {
     const { page, limit, skip } = getPagination(req.query);
     const [blogs, total] = await Promise.all([
       Blog.find(filter)
-        .populate("author", "name")
-        .sort({ createdAt: -1 })
+        .populate("author", PUBLIC_USER_FIELDS)
+        .sort(PUBLIC_SORT)
         .skip(skip)
         .limit(limit),
       Blog.countDocuments(filter),
@@ -338,20 +400,21 @@ exports.recommendBlogs = async (req, res) => {
     const allTags = [...new Set([...likedTags, ...readTags])];
 
 
-    // Find blogs that match the tags but are not already read or liked by the user
-    const { limit, skip } = getPagination(req.query);
-    const recommendedBlogs = await Blog.find({
+    // Live posts on those topics that the user hasn't read or liked yet and
+    // didn't write. Paginated like the other lists.
+    const { page, limit, skip } = getPagination(req.query);
+    const filter = {
       ...publicFilter(),
       tags: { $in: allTags },
-      _id: { $nin: [...user.readBlogs, ...user.likedBlogs] }, // Exclude already read or liked blogs
-    })
-      .populate("author", "name")
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit);
+      _id: { $nin: [...user.readBlogs, ...user.likedBlogs].map((b) => b._id) },
+      author: { $ne: user._id },
+    };
+    const [blogs, total] = await Promise.all([
+      Blog.find(filter).populate("author", PUBLIC_USER_FIELDS).sort(PUBLIC_SORT).skip(skip).limit(limit),
+      Blog.countDocuments(filter),
+    ]);
 
-    // Send recommended blogs
-    res.json(recommendedBlogs);
+    res.json({ blogs, total, page, limit, totalPages: Math.ceil(total / limit) });
   } catch (error) {
     console.error(error.message);
     res.status(500).send("Server error");
@@ -372,9 +435,15 @@ exports.likeBlog = async (req, res) => {
       return res.status(404).json({ msg: "User not found" });
     }
 
+    // Kept for API compatibility alongside claps: a like is one clap, and
+    // unliking takes back all of this reader's claps.
     if (!user.likedBlogs.includes(req.params.id)) {
       user.likedBlogs.push(req.params.id);
       blog.likes.push(req.user.id);
+      if (!blog.claps.some((c) => c.user.toString() === req.user.id)) {
+        blog.claps.push({ user: req.user.id, count: 1 });
+        blog.clapCount += 1;
+      }
     } else {
       user.likedBlogs = user.likedBlogs.filter(
         (id) => id.toString() !== req.params.id
@@ -382,12 +451,45 @@ exports.likeBlog = async (req, res) => {
       blog.likes = blog.likes.filter(
         (userId) => userId.toString() !== req.user.id
       );
+      const entry = blog.claps.find((c) => c.user.toString() === req.user.id);
+      if (entry) {
+        blog.clapCount -= entry.count;
+        blog.claps = blog.claps.filter((c) => c.user.toString() !== req.user.id);
+      }
     }
 
     await user.save();
     await blog.save();
 
+    if (blog.likes.some((u) => u.toString() === req.user.id)) {
+      await notify({ recipient: blog.author, actor: req.user.id, type: "like", blog: blog._id });
+    }
+
     res.json(blog);
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).send("Server error");
+  }
+};
+
+// Record that a reader shared a post (copied its link or sent it to a
+// network). Anonymous readers can share too, so no auth is required; the
+// counter is a rough signal, not an audit log.
+exports.shareBlog = async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    return res.status(404).json({ msg: "Blog not found" });
+  }
+  try {
+    const blog = await Blog.findById(req.params.id);
+    if (!blog || !isPublished(blog)) {
+      return res.status(404).json({ msg: "Blog not found" });
+    }
+    const updated = await Blog.findByIdAndUpdate(
+      blog._id,
+      { $inc: { shares: 1 } },
+      { new: true, projection: { shares: 1 } }
+    );
+    res.json({ shares: updated.shares });
   } catch (error) {
     console.error(error.message);
     res.status(500).send("Server error");
@@ -435,7 +537,7 @@ exports.getBookmarks = async (req, res) => {
     const { page, limit, skip } = getPagination(req.query);
     const filter = { _id: { $in: user.bookmarkedBlogs }, ...publicFilter() };
     const [blogs, total] = await Promise.all([
-      Blog.find(filter).populate("author", "name").sort({ createdAt: -1 }).skip(skip).limit(limit),
+      Blog.find(filter).populate("author", PUBLIC_USER_FIELDS).sort(PUBLIC_SORT).skip(skip).limit(limit),
       Blog.countDocuments(filter),
     ]);
 
@@ -464,6 +566,7 @@ exports.addComment = async (req, res) => {
     }
 
     let resolvedParent = null;
+    let parentAuthor = null;
     if (parentComment) {
       const parent = blog.comments.id(parentComment);
       if (!parent) {
@@ -472,6 +575,7 @@ exports.addComment = async (req, res) => {
       // Replies are one level deep: a reply to a reply threads under the
       // original top-level comment instead of nesting further.
       resolvedParent = parent.parentComment || parent._id;
+      parentAuthor = parent.user;
     }
 
     const newComment = {
@@ -483,7 +587,17 @@ exports.addComment = async (req, res) => {
     blog.comments.unshift(newComment);
     await blog.save();
 
-    await blog.populate({ path: "comments.user", select: "name" });
+    // The person replied to hears about a reply; the post's author hears
+    // about everything else (once — not twice when they wrote the parent).
+    const commentId = blog.comments[0]._id;
+    if (parentAuthor) {
+      await notify({ recipient: parentAuthor, actor: req.user.id, type: "reply", blog: blog._id, comment: commentId });
+    }
+    if (!parentAuthor || parentAuthor.toString() !== blog.author.toString()) {
+      await notify({ recipient: blog.author, actor: req.user.id, type: "comment", blog: blog._id, comment: commentId });
+    }
+
+    await blog.populate({ path: "comments.user", select: PUBLIC_USER_FIELDS });
 
     res
       .status(201)
@@ -499,7 +613,7 @@ exports.getComments = async (req, res) => {
   try {
     const blog = await Blog.findById(req.params.id).populate({
       path: "comments.user",
-      select: "name",
+      select: PUBLIC_USER_FIELDS,
     });
 
     if (!blog || !isVisibleTo(blog, req.user)) {
@@ -545,7 +659,10 @@ exports.deleteComment = async (req, res) => {
       return res.status(404).json({ msg: "Comment not found" });
     }
 
-    if (comment.user.toString() !== req.user.id) {
+    // The commenter can delete their own comment, and a post's author can
+    // remove any comment on their post (moderation). Editing stays
+    // commenter-only — an author shouldn't put words in a reader's mouth.
+    if (comment.user.toString() !== req.user.id && !isOwner(blog, req.user)) {
       return res
         .status(401)
         .json({ msg: "User not authorized to delete this comment" });
@@ -602,7 +719,7 @@ exports.editComment = async (req, res) => {
     // Populate before responding so every comment endpoint returns the same
     // shape ({ user: { _id, name } }). Returning a bare author id here made
     // the client lose the commenter's name when it merged the response.
-    await blog.populate({ path: "comments.user", select: "name" });
+    await blog.populate({ path: "comments.user", select: PUBLIC_USER_FIELDS });
 
     res.json({
       msg: "Comment updated successfully",
@@ -618,7 +735,8 @@ exports.editComment = async (req, res) => {
 // Cloudinary (browser → Cloudinary), keeping large files off the serverless
 // function. `type=content` targets a different folder than the cover.
 exports.uploadSignature = async (req, res) => {
-  const folder = req.query.type === "content" ? "blog-content-images" : "blog-title-images";
+  const folders = { content: "blog-content-images", avatar: "user-avatars" };
+  const folder = folders[req.query.type] || "blog-title-images";
   const timestamp = Math.round(Date.now() / 1000);
   const signature = cloudinary.utils.api_sign_request(
     { timestamp, folder },
@@ -653,6 +771,159 @@ exports.getMyBlogs = async (req, res) => {
     });
   } catch (err) {
     console.error(err.message);
+    res.status(500).send("Server error");
+  }
+};
+
+// Follow or unfollow a topic (toggle). Topics are stored lowercase so
+// "Go" and "go" are one topic.
+exports.toggleTopicFollow = async (req, res) => {
+  const tag = (req.params.tag || "").trim().toLowerCase();
+  if (!tag || tag.length > 60) {
+    return res.status(400).json({ msg: "Invalid topic" });
+  }
+  try {
+    const already = (req.user.followedTopics || []).includes(tag);
+    await User.updateOne(
+      { _id: req.user.id },
+      already ? { $pull: { followedTopics: tag } } : { $addToSet: { followedTopics: tag } }
+    );
+    res.json({ following: !already });
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).send("Server error");
+  }
+};
+
+// Live posts by the writers the user follows or on the topics they follow,
+// newest-published first.
+exports.getFollowingFeed = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select("following followedTopics");
+    if (!user) {
+      return res.status(404).json({ msg: "User not found" });
+    }
+    const { page, limit, skip } = getPagination(req.query);
+    const topics = (user.followedTopics || []).map((t) => new RegExp(`^${escapeRegex(t)}$`, "i"));
+    const sources = [];
+    if (user.following.length) sources.push({ author: { $in: user.following } });
+    if (topics.length) sources.push({ tags: { $in: topics } });
+    if (sources.length === 0) {
+      return res.json({ blogs: [], total: 0, page, limit, totalPages: 0 });
+    }
+
+    // $and, not a spread: publicFilter() already has its own top-level $or.
+    const filter = { $and: [publicFilter(), { $or: sources }, { author: { $ne: user._id } }] };
+    const [blogs, total] = await Promise.all([
+      Blog.find(filter).populate("author", PUBLIC_USER_FIELDS).sort(PUBLIC_SORT).skip(skip).limit(limit),
+      Blog.countDocuments(filter),
+    ]);
+    res.json({ blogs, total, page, limit, totalPages: Math.ceil(total / limit) });
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).send("Server error");
+  }
+};
+
+const MAX_CLAPS = 50;
+
+// Add claps (1–50 in one request, for a burst of clicks) from the current
+// reader, capped at MAX_CLAPS per reader per post. Clapping also likes the
+// post, which is what recommendations learn from.
+exports.clapBlog = async (req, res) => {
+  const add = Number(req.body.count ?? 1);
+  if (!Number.isInteger(add) || add < 1 || add > MAX_CLAPS) {
+    return res.status(400).json({ msg: `count must be a whole number from 1 to ${MAX_CLAPS}` });
+  }
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    return res.status(404).json({ msg: "Blog not found" });
+  }
+  try {
+    const blog = await Blog.findById(req.params.id);
+    if (!blog || !isPublished(blog)) {
+      return res.status(404).json({ msg: "Blog not found" });
+    }
+    if (blog.author && blog.author.toString() === req.user.id) {
+      return res.status(400).json({ msg: "You can't applaud your own post" });
+    }
+
+    const entry = blog.claps.find((c) => c.user.toString() === req.user.id);
+    const before = entry ? entry.count : 0;
+    const after = Math.min(MAX_CLAPS, before + add);
+    if (entry) entry.count = after;
+    else blog.claps.push({ user: req.user.id, count: after });
+    blog.clapCount += after - before;
+    if (!blog.likes.some((u) => u.toString() === req.user.id)) blog.likes.push(req.user.id);
+    await blog.save();
+    await User.updateOne({ _id: req.user.id }, { $addToSet: { likedBlogs: blog._id } });
+
+    if (after > before) {
+      await notify({ recipient: blog.author, actor: req.user.id, type: "clap", blog: blog._id });
+    }
+    res.json({ clapCount: blog.clapCount, mine: after });
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).send("Server error");
+  }
+};
+
+// Take back all of the current reader's claps on a post (and the like).
+exports.unclapBlog = async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    return res.status(404).json({ msg: "Blog not found" });
+  }
+  try {
+    const blog = await Blog.findById(req.params.id);
+    if (!blog) {
+      return res.status(404).json({ msg: "Blog not found" });
+    }
+    const entry = blog.claps.find((c) => c.user.toString() === req.user.id);
+    if (entry) {
+      blog.clapCount -= entry.count;
+      blog.claps = blog.claps.filter((c) => c.user.toString() !== req.user.id);
+      blog.likes = blog.likes.filter((u) => u.toString() !== req.user.id);
+      await blog.save();
+      await User.updateOne({ _id: req.user.id }, { $pull: { likedBlogs: blog._id } });
+    }
+    res.json({ clapCount: blog.clapCount, mine: 0 });
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).send("Server error");
+  }
+};
+
+// Posts the current user has opened, most recent first. readBlogs records
+// each post once, in the order first read; posts that have since gone
+// private or been deleted are left out.
+exports.getHistory = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select("readBlogs");
+    if (!user) {
+      return res.status(404).json({ msg: "User not found" });
+    }
+    const { page, limit, skip } = getPagination(req.query);
+    const live = await Blog.find({ _id: { $in: user.readBlogs }, ...publicFilter() }).select("_id");
+    const liveIds = new Set(live.map((b) => b._id.toString()));
+    const ordered = user.readBlogs.map((id) => id.toString()).filter((id) => liveIds.has(id)).reverse();
+    const pageIds = ordered.slice(skip, skip + limit);
+    const blogs = await Blog.find({ _id: { $in: pageIds } }).populate("author", PUBLIC_USER_FIELDS);
+    blogs.sort((a, b) => pageIds.indexOf(a._id.toString()) - pageIds.indexOf(b._id.toString()));
+    const total = ordered.length;
+    res.json({ blogs, total, page, limit, totalPages: Math.ceil(total / limit) });
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).send("Server error");
+  }
+};
+
+// Forget the current user's reading history. Recommendations start over too,
+// apart from what they've liked.
+exports.clearHistory = async (req, res) => {
+  try {
+    await User.updateOne({ _id: req.user.id }, { $set: { readBlogs: [] } });
+    res.json({ msg: "History cleared" });
+  } catch (error) {
+    console.error(error.message);
     res.status(500).send("Server error");
   }
 };

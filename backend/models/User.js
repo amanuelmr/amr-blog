@@ -14,6 +14,12 @@ const UserSchema = new mongoose.Schema(
       maxlength: 280,
       default: "",
     },
+    // Profile photo (a Cloudinary URL uploaded straight from the browser);
+    // null means the initials avatar.
+    avatarUrl: {
+      type: String,
+      default: null,
+    },
     email: {
       type: String,
       required: [true, "Email is required"],
@@ -46,6 +52,13 @@ const UserSchema = new mongoose.Schema(
     readBlogs: [{ type: mongoose.Schema.Types.ObjectId, ref: "Blog" }],
     likedBlogs: [{ type: mongoose.Schema.Types.ObjectId, ref: "Blog" }],
     bookmarkedBlogs: [{ type: mongoose.Schema.Types.ObjectId, ref: "Blog" }], // "Read later" list
+    // Writers this user follows (indexed: follower counts query it) and
+    // topics they follow, stored lowercase. Both feed the Following tab.
+    following: { type: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }], index: true },
+    followedTopics: [{ type: String }],
+    // Writers whose new posts this user gets by email (indexed: announcing a
+    // post looks up its writer's subscribers).
+    emailSubscriptions: { type: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }], index: true },
   },
   { timestamps: true }
 );

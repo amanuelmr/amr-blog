@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import { api, ApiError } from "@/lib/api";
-import { Blog } from "@/lib/types";
+import { Blog, ReadingListSummary } from "@/lib/types";
+import { ListCards } from "./ListCards";
 import { RequireAuth } from "./RequireAuth";
 import { ArticleRow } from "./ArticleRow";
 import { Spinner, EmptyState, ErrorState } from "./states";
@@ -21,6 +23,13 @@ function SavedPostsInner({ page }: { page: number }) {
   const [data, setData] = useState<BookmarksResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [lists, setLists] = useState<ReadingListSummary[]>([]);
+
+  useEffect(() => {
+    api<{ lists: ReadingListSummary[] }>("/lists/mine")
+      .then((res) => setLists(res.lists))
+      .catch(() => {});
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -41,14 +50,26 @@ function SavedPostsInner({ page }: { page: number }) {
 
   return (
     <div className="mx-auto max-w-4xl px-5 py-12 sm:px-6">
-      <h1 className="mb-8 font-serif text-3xl font-bold tracking-tight">Reading list</h1>
+      <div className="mb-8 flex items-center justify-between gap-4">
+        <h1 className="font-display text-3xl font-bold tracking-tight">Saved</h1>
+        <Link href="/history" className="text-sm text-accent hover:underline">Reading history →</Link>
+      </div>
+
+      {lists.length > 0 && (
+        <section className="mb-12">
+          <h2 className="label mb-4 text-muted">Your lists</h2>
+          <ListCards lists={lists} />
+        </section>
+      )}
+
+      <h2 className="label mb-2 text-muted">Reading list</h2>
 
       {loading ? (
         <Spinner label="Loading your reading list…" />
       ) : error ? (
         <ErrorState message={error} onRetry={load} />
       ) : !data || data.blogs.length === 0 ? (
-        <EmptyState title="Nothing saved yet" hint="Tap Save on an article to add it to your reading list." />
+        <EmptyState title="Nothing saved yet" hint="Use Save on an article to add it to your reading list, or to a list of your own." />
       ) : (
         <>
           <div>

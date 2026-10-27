@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Blog } from "@/lib/types";
 import { CoverImage } from "./CoverImage";
 import { Avatar } from "./Avatar";
-import { formatDate, readingTime, excerpt, blogHref } from "@/lib/format";
+import { formatDate, readingTime, blogHref, publishedDate, summary } from "@/lib/format";
 
 export function FeaturedLead({ blog }: { blog: Blog }) {
   const href = blogHref(blog);
@@ -14,6 +14,12 @@ export function FeaturedLead({ blog }: { blog: Blog }) {
         <div>
           <div className="mb-4 flex items-center gap-2">
             <span className="label text-accent">Featured</span>
+            {blog.postType === "field-note" && (
+              <>
+                <span className="text-faint" aria-hidden="true">/</span>
+                <span className="label text-muted">Field note</span>
+              </>
+            )}
             {blog.tags?.[0] && (
               <>
                 <span className="text-faint" aria-hidden="true">/</span>
@@ -29,13 +35,13 @@ export function FeaturedLead({ blog }: { blog: Blog }) {
           </h2>
 
           <p className="mt-4 max-w-measure text-[1.0625rem] leading-relaxed text-muted">
-            {excerpt(blog.content, 200)}
+            {summary(blog, 200)}
           </p>
 
           <div className="mt-5 flex flex-wrap items-center gap-2.5 font-mono text-[0.6875rem] tabular-nums text-muted">
             {blog.author ? (
               <Link href={`/author/${blog.author._id}`} className="flex items-center gap-2.5 hover:text-fg">
-                <Avatar name={blog.author.name} size={30} />
+                <Avatar name={blog.author.name} src={blog.author.avatarUrl} size={30} />
                 <span className="font-medium text-fg">{blog.author.name}</span>
               </Link>
             ) : (
@@ -45,7 +51,7 @@ export function FeaturedLead({ blog }: { blog: Blog }) {
               </>
             )}
             <span className="text-faint" aria-hidden="true">·</span>
-            <span className="tabular-nums">{formatDate(blog.createdAt)}</span>
+            <span className="tabular-nums">{formatDate(publishedDate(blog))}</span>
             <span className="text-faint" aria-hidden="true">·</span>
             <span className="tabular-nums">{readingTime(blog.content)} min read</span>
           </div>

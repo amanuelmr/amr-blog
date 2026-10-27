@@ -1,53 +1,90 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { Blog } from "@/lib/types";
-import { blogHref, formatDate } from "@/lib/format";
+import { blogHref, formatDate, publishedDate } from "@/lib/format";
+import { InlineError, Skeleton } from "@/components/states";
 
 interface FeedResponse {
   blogs: Blog[];
 }
 
+interface TopicsResponse {
+  topics: { tag: string; count: number }[];
+}
+
 const MOST_READ = 5;
 const MAX_TOPICS = 10;
 
+type Status = "loading" | "error" | "success";
+
+function RailSkeleton() {
+  return (
+    <div className="flex flex-col gap-10" aria-hidden="true">
+      {[MOST_READ, 6].map((rows, section) => (
+        <div key={section}>
+          <Skeleton className="h-[0.6875rem] w-20" />
+          <ul className="mt-4 flex flex-col">
+            {Array.from({ length: section === 0 ? 3 : 5 }).map((_, i) => (
+              <li key={i} className="rule-top py-3.5 first:border-t-0">
+                <Skeleton className="h-3.5 w-full max-w-[14rem]" />
+                <Skeleton className="mt-2 h-2.5 w-16" />
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /**
  * The secondary column: what people actually read, and what the journal
- * actually covers. Both are derived from one feed request rather than new
- * endpoints, and both show real numbers — a rail of invented "trending"
- * would be decoration, not information.
+ * actually covers, across the whole archive. Both show real numbers — a
+ * rail of invented "trending" would be decoration, not information.
  */
 export function SideRail({ currentId }: { currentId?: string }) {
-  const [blogs, setBlogs] = useState<Blog[] | null>(null);
+  const [popular, setPopular] = useState<Blog[]>([]);
+  const [topics, setTopics] = useState<[string, number][]>([]);
+  const [status, setStatus] = useState<Status>("loading");
 
-  useEffect(() => {
+  const load = useCallback(() => {
     let cancelled = false;
-    api<FeedResponse>("/blogs?limit=50")
-      .then((res) => {
-        if (!cancelled) setBlogs(res.blogs ?? []);
+    setStatus("loading");
+    // One extra so the list is still full after leaving out the current post.
+    Promise.all([
+      api<FeedResponse>(`/blogs?sort=popular&limit=${MOST_READ + 1}`),
+      api<TopicsResponse>(`/blogs/topics?limit=${MAX_TOPICS}`),
+    ])
+      .then(([pop, top]) => {
+        if (cancelled) return;
+        setPopular(pop.blogs ?? []);
+        setTopics((top.topics ?? []).map((t) => [t.tag, t.count]));
+        setStatus("success");
       })
       .catch(() => {
-        if (!cancelled) setBlogs([]);
+        if (!cancelled) setStatus("error");
       });
     return () => {
       cancelled = true;
     };
   }, []);
 
-  if (!blogs || blogs.length === 0) return null;
+  useEffect(() => load(), [load]);
 
-  const mostRead = [...blogs]
-    .filter((b) => b._id !== currentId)
-    .sort((a, b) => (b.views ?? 0) - (a.views ?? 0))
-    .slice(0, MOST_READ);
+  if (status === "loading") return <RailSkeleton />;
+  if (status === "error") {
+    return (
+      <div className="text-muted">
+        <InlineError message="Couldn't load the rail." onRetry={load} />
+      </div>
+    );
+  }
+  if (popular.length === 0) return null;
 
-  const counts: Record<string, number> = {};
-  for (const b of blogs) for (const t of b.tags ?? []) counts[t] = (counts[t] ?? 0) + 1;
-  const topics = Object.entries(counts)
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-    .slice(0, MAX_TOPICS);
+  const mostRead = popular.filter((b) => b._id !== currentId).slice(0, MOST_READ);
 
   return (
     <aside className="flex flex-col gap-10">
@@ -69,7 +106,7 @@ export function SideRail({ currentId }: { currentId?: string }) {
                       {b.title}
                     </p>
                     <p className="mt-1 font-mono text-[0.6875rem] tabular-nums text-muted">
-                      {formatDate(b.createdAt)}
+                      {formatDate(publishedDate(b))}
                       <span className="mx-1.5 text-faint" aria-hidden="true">·</span>
                       {(b.views ?? 0).toLocaleString()} views
                     </p>
@@ -88,7 +125,7 @@ export function SideRail({ currentId }: { currentId?: string }) {
             {topics.map(([tag, count]) => (
               <li key={tag} className="rule-top first:border-t-0">
                 <Link
-                  href={`/?q=${encodeURIComponent(tag)}`}
+                  href={`/tag/${encodeURIComponent(tag)}`}
                   className="group flex items-baseline justify-between gap-3 py-2"
                 >
                   <span className="truncate font-mono text-[0.8125rem] text-muted transition-colors group-hover:text-accent">

@@ -267,6 +267,34 @@ function build(type, data, raw) {
       };
     }
 
+    case "newPost":
+      // To a reader who subscribed to this writer. Must always carry the
+      // one-click unsubscribe link.
+      return {
+        subject: `New from ${raw.authorName}: ${raw.title}`,
+        html: wrap(
+          `${data.authorName} published ${data.title}`,
+          eyebrow(`New from ${data.authorName}`) +
+            heading(data.title) +
+            (data.summary ? paragraph(data.summary) : "") +
+            button(data.postUrl, "Read it") +
+            notice(
+              `You’re getting this because you subscribed to ${data.authorName}. <a href="${data.unsubscribeUrl}" style="color:${C.muted};">Unsubscribe</a>.`
+            )
+        ),
+        text: [
+          `AMR Blog — New from ${raw.authorName}`,
+          "",
+          raw.title,
+          ...(raw.summary ? ["", raw.summary] : []),
+          "",
+          `Read it: ${raw.postUrl}`,
+          "",
+          `You're getting this because you subscribed to ${raw.authorName}.`,
+          `Unsubscribe: ${raw.unsubscribeUrl}`,
+        ].join("\n"),
+      };
+
     case "welcome":
     default: {
       const loginUrl = data.loginUrl || "http://localhost:3000/login";
@@ -306,7 +334,7 @@ function build(type, data, raw) {
 /**
  * Build a transactional email.
  *
- * @param {string} type one of emailVerification | passwordReset | passwordChanged | welcome
+ * @param {string} type one of emailVerification | passwordReset | passwordChanged | newPost | welcome
  * @param {object} rawData template fields; every value is HTML-escaped first
  * @returns {{subject: string, html: string, text: string}}
  */
