@@ -80,9 +80,13 @@ export function Highlights({
     if (!root.contains(range.commonAncestorContainer)) return;
     const blockOf = (n: Node) => (n.nodeType === 1 ? (n as Element) : n.parentElement)?.closest(HIGHLIGHT_BLOCKS);
     const startBlock = blockOf(range.startContainer);
-    if (!startBlock || startBlock !== blockOf(range.endContainer)) return;
+    if (!startBlock) return;
     const text = normalizeText(sel.toString());
     if (!text || text.length > MAX_LENGTH) return;
+    // One paragraph at a time. A triple-click selects a whole paragraph but
+    // ends the range at the start of the next block, so judge by the text
+    // rather than by where the range ends.
+    if (!normalizeText(startBlock.textContent ?? "").includes(text)) return;
     const rect = range.getBoundingClientRect();
     setError("");
     setPopover({ kind: "add", text, x: rect.left + rect.width / 2, y: rect.top });
