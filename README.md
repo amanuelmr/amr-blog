@@ -14,15 +14,18 @@ A full-stack blogging platform — a REST API and a modern reading/writing clien
 ## Features
 
 - **Auth** — register → email OTP verification → login, with password reset and change-password flows. Access/refresh JWTs are stored in **httpOnly cookies**; the API auto-refreshes on expiry.
-- **Rich-text authoring** — a Tiptap editor with a selection toolbar and an insert menu (headings, lists, quotes, code, links, inline images via drag/drop/paste) with a distraction-free composer (full-width cover dropzone, borderless title, chip tags); code blocks get syntax highlighting and a copy button on render.
-- **Publishing controls** — save a post as a **draft**, **schedule** it for a future date, or publish immediately; a "Your posts" dashboard lists every post you own regardless of status.
-- **Content safety** — article HTML is sanitized server-side (`xss` allowlist) before it is stored, and again with DOMPurify on render (defense-in-depth).
-- **Reading experience** — an editorial home feed (featured lead + numbered list), full article pages with an auto-generated **table of contents**, **view counts**, **likes**, a **reading list** (bookmarks), threaded **comments**, tag/topic filtering, and full-text **search** with pagination.
-- **Author profiles** — a public `/author/:id` page with a short bio and the author's published posts.
-- **SEO-friendly URLs** — posts resolve by human-readable **slug** (`/blog/the-quiet-architecture-9f3a1c`) with backward-compatible id lookups.
-- **Discovery** — an RSS feed (`/rss.xml`) and a sitemap (`/sitemap.xml`) for feed readers and search engines.
-- **Media** — cover and inline images upload to **Cloudinary**.
-- **Transactional email** — verification, password-reset, and welcome emails (table-based, inline-styled, responsive) via Resend.
+- **Rich-text authoring** — a Tiptap editor with a selection toolbar and an insert menu (headings, lists, quotes, code, links, inline images via drag/drop/paste, image **alt text and captions**, and **embeds** from YouTube, Vimeo, CodePen and CodeSandbox) with a distraction-free composer (full-width cover dropzone, borderless title, optional **subtitle**, chip tags, up to 5); code blocks get syntax highlighting and a copy button on render. Unsaved writing is kept locally and offered back after a closed tab, and leaving with unsaved changes asks first.
+- **Publishing controls** — save a post as a **draft**, **schedule** it for a future date, or publish immediately; posts are dated and ordered by when they went live. A "Your posts" dashboard lists every post you own regardless of status, with views, claps, comments and shares for live ones.
+- **Content safety** — article HTML is sanitized server-side (`xss` allowlist) before it is stored, and again with DOMPurify on render (defense-in-depth). Iframes are allowed only for embed-player URLs on an exact allowlist, and render sandboxed.
+- **Reading experience** — an editorial home feed (featured lead + numbered list) with **Latest / Following / For you** tabs, full article pages with an auto-generated **table of contents**, **view counts** (once per reader, never the author's own), **claps** (up to 50 per reader), **highlights** (with the post's top highlight shown to everyone), a **share menu**, threaded **comments** (authors can remove comments on their posts), topic pages, and full-text **search** with pagination.
+- **Lists & history** — a default reading list plus any number of named lists, private or public; public lists appear on the owner's profile. A reading history page lists what you've read.
+- **Following & notifications** — follow writers and topics; in-app notifications for follows, claps, comments, replies and new posts from writers you follow, with an unread badge in the header.
+- **Email subscriptions** — get a writer's new posts by email, including scheduled posts once they go live; every email has a one-click unsubscribe link.
+- **Author profiles** — a public `/author/:id` page with a photo, short bio, follower counts, public lists and the author's published posts.
+- **SEO-friendly URLs** — posts resolve by human-readable **slug** (`/blog/the-quiet-architecture-9f3a1c`) with backward-compatible id lookups. Each article is server-rendered with its own title, description, canonical URL and Open Graph/Twitter card.
+- **Discovery** — RSS feeds for the whole site (`/rss.xml`), each topic (`/tag/:tag/rss.xml`) and each author (`/author/:id/rss.xml`), and a sitemap (`/sitemap.xml`) for feed readers and search engines.
+- **Media** — cover, inline and profile images upload to **Cloudinary**.
+- **Email** — verification, password-reset, welcome and new-post emails (table-based, inline-styled, responsive) via Resend.
 - **Docs & tests** — OpenAPI/Swagger UI for the API; Jest + Supertest integration tests (in-memory MongoDB) and GitHub Actions CI.
 - **Theming** — light/dark, responsive, accessible.
 
@@ -69,7 +72,7 @@ The server **fails fast** if required environment variables are missing or the d
 | `CLOUDINARY_API_KEY` | **yes** | Cloudinary API key |
 | `CLOUDINARY_API_SECRET` | **yes** | Cloudinary API secret |
 | `CORS_ORIGIN` | no | Allowed origin(s) for the browser client (e.g. `http://localhost:3000`) |
-| `FRONTEND_URL` | no | Public frontend URL used to build links in emails |
+| `FRONTEND_URL` | no | Public frontend URL used to build links in emails (post and unsubscribe links in new-post emails); set it in production |
 | `SWAGGER_SERVER_URL` | no | Override the production server URL shown in Swagger |
 
 ### 2. Frontend
@@ -108,9 +111,13 @@ The frontend footer's **API** link points here automatically (derived from `NEXT
 | Area | Endpoint |
 | --- | --- |
 | Auth | `POST /auth/register`, `/auth/verify-email`, `/auth/login`, `/auth/refresh-token`, `/auth/logout`, `/auth/forgot-password`, `/auth/reset-password`, `/auth/change-password` |
-| Profile | `GET /auth/users/:id` (public profile), `PUT /auth/me` (update your own name/bio) |
-| Blogs | `GET /blogs` (optional `?author=`), `GET /blogs/:slugOrId`, `GET /blogs/search`, `GET /blogs/mine`, `GET /blogs/bookmarks`, `POST /blogs/create`, `PUT /blogs/:id`, `DELETE /blogs/:id` |
-| Engagement | `POST /blogs/:id/like`, `POST /blogs/:id/bookmark`, `GET|POST /blogs/:id/comments`, `PUT|DELETE /blogs/:id/comments/:commentId` (replies via `parentComment`) |
+| Profile | `GET /auth/users/:id` (public profile), `PUT /auth/me` (update your own name/bio/photo) |
+| Following | `POST /auth/users/:id/follow`, `GET /auth/me/follows`, `POST /blogs/topics/:tag/follow`, `GET /blogs/following` |
+| Email | `POST /auth/users/:id/subscribe`, `POST /auth/unsubscribe` (signed token from the email link) |
+| Blogs | `GET /blogs` (optional `?author=`, `?tag=`, `?sort=popular`), `GET /blogs/:slugOrId`, `GET /blogs/search`, `GET /blogs/topics`, `GET /blogs/recommend`, `GET /blogs/mine`, `GET /blogs/bookmarks`, `GET|DELETE /blogs/history`, `POST /blogs/create`, `PUT /blogs/:id`, `DELETE /blogs/:id` |
+| Engagement | `POST|DELETE /blogs/:id/clap`, `POST /blogs/:id/like` (legacy; one clap), `POST /blogs/:id/share`, `POST /blogs/:id/bookmark`, `GET|POST /blogs/:id/highlights`, `DELETE /blogs/:id/highlights/:highlightId`, `GET|POST /blogs/:id/comments`, `PUT|DELETE /blogs/:id/comments/:commentId` (replies via `parentComment`) |
+| Lists | `GET /lists/mine`, `GET /lists/user/:userId`, `POST /lists`, `GET|PUT|DELETE /lists/:id`, `POST /lists/:id/items` |
+| Notifications | `GET /notifications`, `GET /notifications/unread-count`, `POST /notifications/read-all`, `POST /notifications/:id/read` |
 
 A post's `status` (`draft`/`published`) and `publishedAt` control visibility — see the `Blog` schema in Swagger for details. A published post with a future `publishedAt` is scheduled and stays hidden until then; only its author can see a draft or a not-yet-due scheduled post.
 
@@ -123,7 +130,7 @@ cd backend
 npm test          # Jest + Supertest against an in-memory MongoDB
 ```
 
-Coverage includes the auth lifecycle, profile updates, blog CRUD & authorization, draft/scheduled visibility, threaded comments, likes, bookmarks, slug resolution, and HTML sanitization. CI runs lint + tests on every push/PR (`.github/workflows/ci.yml`).
+Coverage includes the auth lifecycle, profile updates and photos, blog CRUD & authorization, draft/scheduled visibility and publish-date ordering, view counting, threaded comments and moderation, claps, likes, shares, bookmarks, named lists, reading history, highlights, follows and the Following feed, notifications, email subscriptions and new-post announcements, slug resolution, and HTML sanitization including embeds. CI runs lint + tests on every push/PR (`.github/workflows/ci.yml`).
 
 ## Scripts
 
@@ -136,11 +143,12 @@ Coverage includes the auth lifecycle, profile updates, blog CRUD & authorization
 amr-blog/
 ├── backend/
 │   ├── config/         # db, cloudinary, env validation
-│   ├── controllers/    # auth, blog
+│   ├── controllers/    # auth, blog, lists, highlights, notifications
 │   ├── middlewares/    # auth (required/optional), validation, rate limiting
-│   ├── models/         # User, Blog
-│   ├── routes/         # /auth, /blogs
-│   ├── utils/          # tokens, OTP, slugify, sanitize, blog visibility, email templates
+│   ├── models/         # User, Blog, ReadingList, Highlight, Notification
+│   ├── routes/         # /auth, /blogs, /lists, /notifications
+│   ├── utils/          # tokens, OTP, slugify, sanitize + embed allowlist, blog visibility,
+│   │                   # email templates, notifications, new-post announcements, backfills
 │   └── tests/          # Jest + Supertest
 └── frontend/
     └── src/
